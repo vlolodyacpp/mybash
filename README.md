@@ -1,2 +1,2 @@
 # mybash
-My realithation bash in C
+My realithation bash in C lalala
