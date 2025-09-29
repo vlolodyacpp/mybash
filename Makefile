@@ -5,9 +5,9 @@ OBJ_DIR := $(BUILD_DIR)/obj
 DEP_DIR := $(BUILD_DIR)/dep
 BIN_DIR := bin
 
-SRCS := $(wildcard $(SRC_DIR)/*.cpp) 
-OBJS := $(patsubst $(SRC_DIR)/%.cpp, $(OBJ_DIR)/%.o, $(SRCS))
-DEPS := $(patsubst $(SRC_DIR)/%.cpp, $(DEP_DIR)/%.d, $(SRCS))
+SRCS := $(wildcard $(SRC_DIR)/*.c) 
+OBJS := $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRCS))
+DEPS := $(patsubst $(SRC_DIR)/%.c, $(DEP_DIR)/%.d, $(SRCS))
 TARGET := $(BIN_DIR)/main
 
 CXX := gcc
@@ -24,7 +24,7 @@ $(TARGET): $(OBJS) | $(BIN_DIR)
 	@echo "Linking $@..."
 	@$(LD) $(LDFLAGS) $^ -o $@
 
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp | $(OBJ_DIR) $(DEP_DIR)
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR) $(DEP_DIR)
 	@echo "Compiling $@..."
 	@$(CXX) $(CXXFLAGS) -MF $(DEP_DIR)/$*.d -c $< -o $@
 
@@ -42,6 +42,10 @@ run: $(TARGET)
 debug: $(TARGET)
 	@echo "debugging $(TARGET)..."
 	@gdb ./$(TARGET)
+
+valgrind: $(TARGET)
+	@echo "Running $(TARGET) with valgrind..."
+	@valgrind ./$(TARGET)
 
 -include $(DEPS)
 
