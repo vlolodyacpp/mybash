@@ -11,7 +11,7 @@ typedef enum {
     TOKEN_SEMICOL, // ;
     TOKEN_AND, // &&
     TOKEN_OR, // ||
-    TOKEN_QUOTE, // "/'
+    TOKEN_WORD_IN_QUOTES, // "/'
     TOKEN_EOF // ну тут и так понятно
 } TokenType;
 

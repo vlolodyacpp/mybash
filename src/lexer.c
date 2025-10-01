@@ -1,3 +1,4 @@
+
 #include "../inc/lexer.h"
 #include "../inc/token.h"
 #include <stdio.h>
@@ -5,6 +6,7 @@
 #include <ctype.h>
 
 #define MAX_TOKEN_LENGTH 256
+const char word_delimeters[] = " \t;|&<>"; 
 
 int is_delimiter(char c){
     for(int i = 0; i < COUNT_DELIMITERS; ++i){
@@ -21,12 +23,12 @@ int is_space(char c){
 
 int define_simple_word(char c){
     if(c == '\0') return END_LINE;
-    if(c == '"' || c == '\'') return QUOTE;
+    if(c == '"' || c == '\'') return WORD_IN_QUOTES;
     if(is_delimiter(c)) return DELIMETERS;
     return SIMPLE_WORD;
 }
 
-int define_word_len(char* word, int offset){
+int define_word_len(const char* word, int offset){
 	int word_len = 0, delim_flag = 0;
 	while (1) {
 		for (int i = 0; i < COUNT_DELIMITERS; i++){
@@ -43,13 +45,7 @@ int define_word_len(char* word, int offset){
 	return word_len;
 }
 
-char* create_word(int word_len){
-    char* new_word[word_len];
-    return new_word;
-}
-
-
-Token *create_token(TokenType type, const char *value){
+Token *create_token(TokenType type, char *value){
     Token *token = malloc(sizeof(Token));
     if(!token){
         return NULL;
@@ -63,11 +59,11 @@ Token *create_token(TokenType type, const char *value){
 
 
 
-Token *tokenize(const char *input){
-    Token *array_token = (Token*)malloc(strlen(input) * sizeof(Token*));
-    int i = 0;
+Token **tokenize(const char *input){
+    Token **array_token = (Token**)malloc(strlen(input) * sizeof(Token*));
+    int i = 0, token_cnt = 0;
     while (input[i] != '\0'){
-        while(is_sace(input[i])) ++i;
+        while(is_space(input[i])) ++i;
         Token *new_token;
 
         SimpleWord type = define_simple_word(input[i]);
@@ -76,66 +72,100 @@ Token *tokenize(const char *input){
                 if(input[i] == '|' && input[i+1] == '|'){
                     new_token = create_token(TOKEN_OR, "||");
                     i += 2;
-                } else if(input[i] == '|' && input[i+1] != '|'){
+                } else if(input[i++] == '|'){
                     new_token = create_token(TOKEN_PIPE, "|");
-                    ++i;
                 }
 
                 if(input[i] == '>' && input[i+1] == '>'){
                     new_token = create_token(TOKEN_REDIR_APPEND, ">>");
                     i += 2;
-                } else if(input[i] == '>' && input[i+1] != '>'){
+                } else if(input[i++] == '>'){
                     new_token = create_token(TOKEN_REDIR_IN, ">");
-                    ++i;
                 }
 
                 if(input[i] == '&' && input[i+1] == '&'){
                     new_token = create_token(TOKEN_AND, "&&");
                     i += 2;
-                } else if(input[i] == '&' && input[i+1] != '&'){
+                } else if(input[i++] == '&'){
                     new_token = create_token(TOKEN_AMPER, "&");
-                    ++i;
                 }
-                if(input[i] == '<'){
+                if(input[i++] == '<'){
                     new_token = create_token(TOKEN_REDIR_OUT, "<");
-                    ++i;
                 }
-                if(input[i] == ';'){
+                if(input[i++] == ';'){
                     new_token = create_token(TOKEN_REDIR_OUT, "<");
-                    ++i;
                 }
-            case QUOTE:
+                array_token[token_cnt++] = new_token;
+                break;
+            case WORD_IN_QUOTES: {
+                char q = '\'';
                 if(input[i] == '"'){
-                    new_token = create_token(TOKEN_QUOTE, '"');
-                } else {
-                    new_token = create_token(TOKEN_QUOTE, '\'');
+                    q = '"';
                 }
-            case SIMPLE_WORD:
+
+                int count = 1;
+                for( ; input[i + count] != q && input[i + count] != '\0'; ++count); // len_word in "" or ''
+                char word[count + 1]; // + размер слова
+
+                strncpy(word, &(input[i]), count);
+                word[count] = '\0';
+                i += (count + 1);
+                new_token = create_token(TOKEN_WORD_IN_QUOTES, word);
+                array_token[token_cnt++] = new_token;
+                break;
+
+
+                // echo "asdfsdafsdaf"
+                // echo
+                // "asdffsdsdfasdfa"
+            }
+            case SIMPLE_WORD: {
                 int word_len = define_word_len(input, i);
-                char *word = create_word(word_len);
+                char word[word_len];
                 for(int i = 0; i < word_len; ++i){
-                    word[i] == input[i];
+                    word[i] = input[i];
                 }
                 new_token = create_token(TOKEN_WORD, word);
-            case END_LINE:
-
-
-
+                array_token[token_cnt] = new_token;
+                i += word_len;
+                break;
+            }
+            default:
+                break;
         }
 
 
 
-
-
-
-    
-
-        // ls cd pwd help echo exit jobs fg bg kill
-
-
-
-
-
-
     }
+
+    return array_token;
 }
+
+
+void print(Token **array) {
+    printf("    TOKENS:\n");
+    for (int i = 0; array[i] && array[i]->type != TOKEN_EOF; ++i) {
+        printf("%d - %s\n", array[i]->type, array[i]->value ? array[i]->value : "(null)");
+    }
+    printf("=== END ===\n");
+}
+
+
+
+
+
+
+/*
+
+case bbrbr:
+    char *word[5];  BNONONONONNONONONONO
+
+case brbrbr: {
+    char *word[5];
+
+}
+
+
+
+
+*/
