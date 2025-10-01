@@ -5,8 +5,8 @@
 #include <string.h>
 #include <ctype.h>
 
-#define MAX_TOKEN_LENGTH 256
 const char word_delimeters[] = " \t;|&<>"; 
+
 
 int is_delimiter(char c){
     for(int i = 0; i < COUNT_DELIMITERS; ++i){
@@ -72,79 +72,72 @@ Token **tokenize(const char *input){
                 if(input[i] == '|' && input[i+1] == '|'){
                     new_token = create_token(TOKEN_OR, "||");
                     i += 2;
-                } else if(input[i++] == '|'){
+                } else if(input[i] == '|'){
                     new_token = create_token(TOKEN_PIPE, "|");
-                }
-
-                if(input[i] == '>' && input[i+1] == '>'){
+                    i++;
+                } else if(input[i] == '>' && input[i+1] == '>'){
                     new_token = create_token(TOKEN_REDIR_APPEND, ">>");
                     i += 2;
-                } else if(input[i++] == '>'){
+                } else if(input[i] == '>'){
                     new_token = create_token(TOKEN_REDIR_IN, ">");
-                }
-
-                if(input[i] == '&' && input[i+1] == '&'){
+                    i++;
+                } else if(input[i] == '&' && input[i+1] == '&'){
                     new_token = create_token(TOKEN_AND, "&&");
                     i += 2;
                 } else if(input[i++] == '&'){
                     new_token = create_token(TOKEN_AMPER, "&");
-                }
-                if(input[i++] == '<'){
+                    i++;
+                } else if(input[i] == '<'){
                     new_token = create_token(TOKEN_REDIR_OUT, "<");
-                }
-                if(input[i++] == ';'){
+                    i++;
+                } else if(input[i] == ';'){
                     new_token = create_token(TOKEN_REDIR_OUT, "<");
+                    i++;
                 }
                 array_token[token_cnt++] = new_token;
                 break;
             case WORD_IN_QUOTES: {
-                char q = '\'';
-                if(input[i] == '"'){
-                    q = '"';
-                }
+                char q = input[i];
 
                 int count = 1;
-                for( ; input[i + count] != q && input[i + count] != '\0'; ++count); // len_word in "" or ''
-                char word[count + 1]; // + размер слова
-
-                strncpy(word, &(input[i]), count);
-                word[count] = '\0';
-                i += (count + 1);
+                for( ; input[i + count] != q; ++count); // len_word in "" or ''
+                int word_len = count + 1;
+                char *word = strndup(&input[i], word_len);
+                i += word_len;
                 new_token = create_token(TOKEN_WORD_IN_QUOTES, word);
                 array_token[token_cnt++] = new_token;
+                
                 break;
-
-
-                // echo "asdfsdafsdaf"
-                // echo
-                // "asdffsdsdfasdfa"
             }
             case SIMPLE_WORD: {
                 int word_len = define_word_len(input, i);
-                char word[word_len];
-                for(int i = 0; i < word_len; ++i){
-                    word[i] = input[i];
-                }
+                char *word = strndup(&input[i], word_len);
+                
                 new_token = create_token(TOKEN_WORD, word);
-                array_token[token_cnt] = new_token;
+                array_token[token_cnt++] = new_token;
                 i += word_len;
                 break;
             }
             default:
+                i++;
                 break;
         }
 
 
 
     }
+    array_token[token_cnt++] = create_token(TOKEN_EOF, "EOF");
+    array_token[token_cnt] = NULL; // удобный терминатор для циклов
 
     return array_token;
 }
 
 
+
+
 void print(Token **array) {
     printf("    TOKENS:\n");
-    for (int i = 0; array[i] && array[i]->type != TOKEN_EOF; ++i) {
+    for (int i = 0; array[i] != NULL; ++i) {
         printf("%d - %s\n", array[i]->type, array[i]->value ? array[i]->value : "(null)");
     }
     printf("=== END ===\n");
