@@ -4,5 +4,7 @@
 
 int main(){
     char *vvod = "ls |& cat > file.txt 'a'";
-    print(tokenize(vvod));
+    Token **array = tokenize(vvod);
+    print(array);
+    free_tokens(array);
 }

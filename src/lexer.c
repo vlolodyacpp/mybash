@@ -22,7 +22,6 @@ int is_space(char c){
 
 
 int define_simple_word(char c){
-    if(c == '\0') return END_LINE;
     if(c == '"' || c == '\'') return WORD_IN_QUOTES;
     if(is_delimiter(c)) return DELIMETERS;
     return SIMPLE_WORD;
@@ -45,6 +44,27 @@ int define_word_len(const char* word, int offset){
 	return word_len;
 }
 
+void free_tokens(Token **array_token) {
+    if (!array_token) return;
+    
+    for (int i = 0; array_token[i] != NULL; i++) {
+        if (array_token[i]->value) {
+            free(array_token[i]->value);
+        }
+        free(array_token[i]);
+    }
+    free(array_token);
+}
+
+
+void print(Token **array) {
+    printf("=== TOKENS ===:\n");
+    for (int i = 0; array[i] != NULL; ++i) {
+        printf("%d - %s\n", array[i]->type, array[i]->value ? array[i]->value : "(null)");
+    }
+    printf("=== END ===\n");
+}
+
 Token *create_token(TokenType type, char *value){
     Token *token = malloc(sizeof(Token));
     if(!token){
@@ -52,7 +72,11 @@ Token *create_token(TokenType type, char *value){
     }
 
     token -> type = type;
-    token -> value = value;
+    if (value){
+       token -> value = strdup(value);
+    } else {
+       token -> value = NULL;
+    }
 
     return token;
 }
@@ -91,7 +115,7 @@ Token **tokenize(const char *input){
                     new_token = create_token(TOKEN_REDIR_OUT, "<");
                     i++;
                 } else if(input[i] == ';'){
-                    new_token = create_token(TOKEN_REDIR_OUT, "<");
+                    new_token = create_token(TOKEN_SEMICOL, ";");
                     i++;
                 }
                 array_token[token_cnt++] = new_token;
@@ -102,19 +126,38 @@ Token **tokenize(const char *input){
                 int count = 1;
                 for( ; input[i + count] != q; ++count); // len_word in "" or ''
                 int word_len = count + 1;
-                char *word = strndup(&input[i], word_len);
-                i += word_len;
+
+                char *word = (char*)malloc(word_len * sizeof(char));
+                if(!word){
+                    perror("malloc error");
+                    free(word);
+                    break;
+                }
+                strncpy(word, &input[i], word_len);
+                word[word_len] = '\0';
+
                 new_token = create_token(TOKEN_WORD_IN_QUOTES, word);
                 array_token[token_cnt++] = new_token;
-                
+                free(word);
+            
+                i += word_len;
                 break;
             }
             case SIMPLE_WORD: {
                 int word_len = define_word_len(input, i);
-                char *word = strndup(&input[i], word_len);
-                
+                char *word = (char*)malloc((word_len + 1) * sizeof(char));
+                if(!word){
+                    perror("malloc error");
+                    free(word);
+                    break;
+                }
+                strncpy(word, &input[i], word_len);
+                word[word_len] = '\0';
+
                 new_token = create_token(TOKEN_WORD, word);
                 array_token[token_cnt++] = new_token;
+                free(word);
+
                 i += word_len;
                 break;
             }
@@ -127,7 +170,7 @@ Token **tokenize(const char *input){
 
     }
     array_token[token_cnt++] = create_token(TOKEN_EOF, "EOF");
-    array_token[token_cnt] = NULL; // удобный терминатор для циклов
+    array_token[token_cnt] = NULL; 
 
     return array_token;
 }
@@ -135,13 +178,6 @@ Token **tokenize(const char *input){
 
 
 
-void print(Token **array) {
-    printf("    TOKENS:\n");
-    for (int i = 0; array[i] != NULL; ++i) {
-        printf("%d - %s\n", array[i]->type, array[i]->value ? array[i]->value : "(null)");
-    }
-    printf("=== END ===\n");
-}
 
 
 
