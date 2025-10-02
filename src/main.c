@@ -3,7 +3,7 @@
 #include "../inc/token.h"
 
 int main(){
-    char *vvod = "ls |& cat > file.txt 'a'";
+    char *vvod = "ls|& cat > file.txt 'a'";
     Token **array = tokenize(vvod);
     print(array);
     free_tokens(array);

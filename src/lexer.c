@@ -28,8 +28,9 @@ int define_simple_word(char c){
 }
 
 int define_word_len(const char* word, int offset){
-	int word_len = 0, delim_flag = 0;
+	int word_len = 0;
 	while (1) {
+        int delim_flag = 0;
 		for (int i = 0; i < COUNT_DELIMITERS; i++){
 			if (word[offset] == word_delimeters[i]){
 				delim_flag = 1;
@@ -84,7 +85,7 @@ Token *create_token(TokenType type, char *value){
 
 
 Token **tokenize(const char *input){
-    Token **array_token = (Token**)malloc(strlen(input) * sizeof(Token*));
+    Token **array_token = (Token**)malloc((strlen(input) + 2) * sizeof(Token*));
     int i = 0, token_cnt = 0;
     while (input[i] != '\0'){
         while(is_space(input[i])) ++i;
@@ -108,7 +109,7 @@ Token **tokenize(const char *input){
                 } else if(input[i] == '&' && input[i+1] == '&'){
                     new_token = create_token(TOKEN_AND, "&&");
                     i += 2;
-                } else if(input[i++] == '&'){
+                } else if(input[i] == '&'){
                     new_token = create_token(TOKEN_AMPER, "&");
                     i++;
                 } else if(input[i] == '<'){
@@ -125,12 +126,12 @@ Token **tokenize(const char *input){
 
                 int count = 1;
                 for( ; input[i + count] != q; ++count); // len_word in "" or ''
-                int word_len = count + 1;
+                int word_len = count + 1; // count + 1 - размер строки с кавычками, не учитывая послднего символа
+                                          
 
-                char *word = (char*)malloc(word_len * sizeof(char));
+                char *word = (char*)malloc((word_len + 1) * sizeof(char)); // учитываем последний символ, word_len - последняя позиция
                 if(!word){
                     perror("malloc error");
-                    free(word);
                     break;
                 }
                 strncpy(word, &input[i], word_len);
@@ -148,7 +149,6 @@ Token **tokenize(const char *input){
                 char *word = (char*)malloc((word_len + 1) * sizeof(char));
                 if(!word){
                     perror("malloc error");
-                    free(word);
                     break;
                 }
                 strncpy(word, &input[i], word_len);
