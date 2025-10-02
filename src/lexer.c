@@ -69,6 +69,7 @@ void print(Token **array) {
 Token *create_token(TokenType type, char *value){
     Token *token = malloc(sizeof(Token));
     if(!token){
+        perror("malloc error");
         return NULL;
     }
 
@@ -86,6 +87,11 @@ Token *create_token(TokenType type, char *value){
 
 Token **tokenize(const char *input){
     Token **array_token = (Token**)malloc((strlen(input) + 2) * sizeof(Token*));
+    if(!array_token){
+        perror("malloc error");
+        return NULL;
+    }
+
     int i = 0, token_cnt = 0;
     while (input[i] != '\0'){
         while(is_space(input[i])) ++i;
@@ -94,33 +100,49 @@ Token **tokenize(const char *input){
         SimpleWord type = define_simple_word(input[i]);
         switch(type){
             case DELIMETERS:
-                if(input[i] == '|' && input[i+1] == '|'){
+               
+
+                if (input[i] == '&' && input[i+1] == '>' && input[i+2] == '>') {
+                    new_token = create_token(TOKEN_AMPER_REDIR_APPEND, "&>>");
+                    i += 3;
+
+                } else if (input[i] == '|' && input[i+1] == '&') {
+                    new_token = create_token(TOKEN_PIPE_AMPER, "|&");
+                    i += 2;
+                } else if (input[i] == '|' && input[i+1] == '|') {
                     new_token = create_token(TOKEN_OR, "||");
                     i += 2;
-                } else if(input[i] == '|'){
-                    new_token = create_token(TOKEN_PIPE, "|");
-                    i++;
-                } else if(input[i] == '>' && input[i+1] == '>'){
-                    new_token = create_token(TOKEN_REDIR_APPEND, ">>");
-                    i += 2;
-                } else if(input[i] == '>'){
-                    new_token = create_token(TOKEN_REDIR_IN, ">");
-                    i++;
-                } else if(input[i] == '&' && input[i+1] == '&'){
+                } else if (input[i] == '&' && input[i+1] == '&') {
                     new_token = create_token(TOKEN_AND, "&&");
                     i += 2;
-                } else if(input[i] == '&'){
+                } else if (input[i] == '>' && input[i+1] == '>') {
+                    new_token = create_token(TOKEN_REDIR_APPEND, ">>");
+                    i += 2;
+                } else if (input[i] == '&' && input[i+1] == '>') {
+                    new_token = create_token(TOKEN_AMPER_REDIR_IN, "&>");
+                    i += 2;
+
+
+                } else if (input[i] == '|') {
+                    new_token = create_token(TOKEN_PIPE, "|");
+                    i += 1;
+                } else if (input[i] == '&') {
                     new_token = create_token(TOKEN_AMPER, "&");
-                    i++;
-                } else if(input[i] == '<'){
+                    i += 1;
+                } else if (input[i] == '>') {
+                    new_token = create_token(TOKEN_REDIR_IN, ">");
+                    i += 1;
+                } else if (input[i] == '<') {
                     new_token = create_token(TOKEN_REDIR_OUT, "<");
-                    i++;
-                } else if(input[i] == ';'){
+                    i += 1;
+                } else if (input[i] == ';') {
                     new_token = create_token(TOKEN_SEMICOL, ";");
-                    i++;
-                }
+                    i += 1;
+                } 
+
                 array_token[token_cnt++] = new_token;
-                break;
+                break;          
+
             case WORD_IN_QUOTES: {
                 char q = input[i];
 
@@ -179,7 +201,12 @@ Token **tokenize(const char *input){
 
 
 
+/*
+"||;dddfd&" - ||;dddfd&
 
+||*dddfd& - || ; dddfd &
+
+*/
 
 
 

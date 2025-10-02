@@ -8,6 +8,9 @@ typedef enum {
     TOKEN_REDIR_OUT, // <
     TOKEN_REDIR_APPEND, // >>
     TOKEN_AMPER, // &
+    TOKEN_AMPER_REDIR_APPEND, // &>>
+    TOKEN_AMPER_REDIR_IN, // &>
+    TOKEN_PIPE_AMPER, // |&
     TOKEN_SEMICOL, // ;
     TOKEN_AND, // &&
     TOKEN_OR, // ||
@@ -20,4 +23,8 @@ typedef struct Token {
     char *value;
 
 } Token;
+
+// | |& ||  > < >> & && &> &>> ; 
+
+
 
