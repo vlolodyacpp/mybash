@@ -45,48 +45,46 @@ int define_word_len(const char* word, int offset){
 	return word_len;
 }
 
-void free_tokens(Token **array_token) {
+void free_tokens(Token *array_token) {
     if (!array_token) return;
-    
-    for (int i = 0; array_token[i] != NULL; i++) {
-        if (array_token[i]->value) {
-            free(array_token[i]->value);
+    int i;
+    for (i = 0; array_token[i].type != TOKEN_EOF; i++) {
+        if (array_token[i].value) {
+            free(array_token[i].value);
         }
-        free(array_token[i]);
+    }
+    if(array_token[i].value){
+        free(array_token[i].value);
     }
     free(array_token);
 }
 
 
-void print(Token **array) {
+void print(Token *array_token) {
     printf("=== TOKENS ===:\n");
-    for (int i = 0; array[i] != NULL; ++i) {
-        printf("%d - %s\n", array[i]->type, array[i]->value ? array[i]->value : "(null)");
+    for (int i = 0; array_token[i].type != TOKEN_EOF; ++i) {
+        printf("%d - %s\n", array_token[i].type, array_token[i].value ? array_token[i].value : "(null)");
     }
     printf("=== END ===\n");
 }
 
-Token *create_token(TokenType type, char *value){
-    Token *token = malloc(sizeof(Token));
-    if(!token){
-        perror("malloc error");
-        return NULL;
-    }
 
-    token -> type = type;
+
+Token create_token(TokenType type, char *value){
+    Token token;
+    token.type = type;
     if (value){
-       token -> value = strdup(value);
+       token.value = strdup(value);
     } else {
-       token -> value = NULL;
+       token.value = NULL;
     }
-
     return token;
 }
 
 
 
-Token **tokenize(const char *input){
-    Token **array_token = (Token**)malloc((strlen(input) + 2) * sizeof(Token*));
+Token *tokenize(const char *input){
+    Token *array_token = (Token*)malloc((strlen(input) + 2) * sizeof(Token*));
     if(!array_token){
         perror("malloc error");
         return NULL;
@@ -95,13 +93,12 @@ Token **tokenize(const char *input){
     int i = 0, token_cnt = 0;
     while (input[i] != '\0'){
         while(is_space(input[i])) ++i;
-        Token *new_token;
+        Token new_token;
 
         SimpleWord type = define_simple_word(input[i]);
         switch(type){
             case DELIMETERS:
-               
-
+        
                 if (input[i] == '&' && input[i+1] == '>' && input[i+2] == '>') {
                     new_token = create_token(TOKEN_AMPER_REDIR_APPEND, "&>>");
                     i += 3;
@@ -192,7 +189,6 @@ Token **tokenize(const char *input){
 
     }
     array_token[token_cnt++] = create_token(TOKEN_EOF, "EOF");
-    array_token[token_cnt] = NULL; 
 
     return array_token;
 }

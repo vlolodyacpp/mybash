@@ -4,7 +4,7 @@
 
 int main(){
     char *vvod = "ls|& cat >>& ;| |& & &>> &> file.txt '' &>";
-    Token **array = tokenize(vvod);
+    Token *array = tokenize(vvod);
     print(array);
     free_tokens(array);
 }

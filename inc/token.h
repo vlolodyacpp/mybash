@@ -18,11 +18,12 @@ typedef enum {
     TOKEN_EOF // ну тут и так понятно
 } TokenType;
 
-typedef struct Token {
-    TokenType type;
-    char *value;
 
+typedef struct Token {
+    char *value;
+    TokenType type;
 } Token;
+
 
 // | |& ||  > < >> & && &> &>> ; 
 
