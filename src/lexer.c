@@ -5,6 +5,9 @@
 #include <string.h>
 #include <ctype.h>
 
+#define STANDART_CAPACITY 16
+
+
 const char word_delimeters[] = " \t;|&<>"; 
 
 
@@ -30,15 +33,8 @@ int define_simple_word(char c){
 int define_word_len(const char* word, int offset){
 	int word_len = 0;
 	while (1) {
-        int delim_flag = 0;
-		for (int i = 0; i < COUNT_DELIMITERS; i++){
-			if (word[offset] == word_delimeters[i]){
-				delim_flag = 1;
-				break;
-			}
-        }
-        if (delim_flag) break;
-		if (word[offset] == '\0') break;
+        if (word[offset] == '\0') break;
+        if(is_delimiter(word[offset]) || is_space(word[offset])) break;
 		word_len++;
 		offset++;
 	}
@@ -49,13 +45,9 @@ void free_tokens(Token *array_token) {
     if (!array_token) return;
     int i;
     for (i = 0; array_token[i].type != TOKEN_EOF; i++) {
-        if (array_token[i].value) {
-            free(array_token[i].value);
-        }
-    }
-    if(array_token[i].value){
         free(array_token[i].value);
     }
+    free(array_token[i].value);
     free(array_token);
 }
 
@@ -84,15 +76,38 @@ Token create_token(TokenType type, char *value){
 
 
 Token *tokenize(const char *input){
-    Token *array_token = (Token*)malloc((strlen(input) + 2) * sizeof(Token*));
+
+    if(!input) { 
+        perror("error lol");
+        return NULL;
+    }
+
+    const size_t len = strlen(input);
+
+    size_t capacity = STANDART_CAPACITY;
+    size_t token_cnt = 0;
+    Token *array_token = (Token*)malloc(capacity * sizeof(Token));
     if(!array_token){
         perror("malloc error");
         return NULL;
     }
 
-    int i = 0, token_cnt = 0;
-    while (input[i] != '\0'){
+    size_t i = 0;
+    while (i < len){
         while(is_space(input[i])) ++i;
+        if(i >= len) break;
+
+        if(token_cnt >= capacity){
+            capacity *= 2;
+            Token *new_array = (Token*)realloc(array_token, capacity * sizeof(Token));
+            if(!new_array){
+                perror("realloc error");
+                free_tokens(array_token);
+                return NULL;
+            }
+            array_token = new_array;
+        }
+
         Token new_token;
 
         SimpleWord type = define_simple_word(input[i]);

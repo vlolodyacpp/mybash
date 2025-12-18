@@ -14,6 +14,7 @@ CXX := gcc
 WARNINGS := -Wall -Wextra -Werror -Wpedantic
 CPPFLAGS := -I$(INC_DIR) -MMD -MP
 CXXFLAGS := -g $(WARNINGS) $(CPPFLAGS)
+VALGRINDFLAG := --leak-check=full
 
 LD := gcc
 LDFLAGS := -lm
@@ -45,7 +46,7 @@ debug: $(TARGET)
 
 valgrind: $(TARGET)
 	@echo "Running $(TARGET) with valgrind..."
-	@valgrind ./$(TARGET)
+	@valgrind $(VALGRINDFLAG) ./$(TARGET)
 
 -include $(DEPS)
 
