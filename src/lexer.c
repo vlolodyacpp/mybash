@@ -141,11 +141,11 @@ Token *tokenize(const char *input){
                 } else if (input[i] == '&') {
                     new_token = create_token(TOKEN_AMPER, "&");
                     i += 1;
-                } else if (input[i] == '>') {
-                    new_token = create_token(TOKEN_REDIR_IN, ">");
-                    i += 1;
                 } else if (input[i] == '<') {
-                    new_token = create_token(TOKEN_REDIR_OUT, "<");
+                    new_token = create_token(TOKEN_REDIR_IN, "<");
+                    i += 1;
+                } else if (input[i] == '>') {
+                    new_token = create_token(TOKEN_REDIR_OUT, ">");
                     i += 1;
                 } else if (input[i] == ';') {
                     new_token = create_token(TOKEN_SEMICOL, ";");

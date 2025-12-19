@@ -4,8 +4,8 @@
 typedef enum {
     TOKEN_WORD, // def word or aguemenet/flag
     TOKEN_PIPE, // |
-    TOKEN_REDIR_IN, // >
-    TOKEN_REDIR_OUT, // <
+    TOKEN_REDIR_IN, // <
+    TOKEN_REDIR_OUT, // >
     TOKEN_REDIR_APPEND, // >>
     TOKEN_AMPER, // &
     TOKEN_AMPER_REDIR_APPEND, // &>>
