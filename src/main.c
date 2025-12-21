@@ -1,9 +1,33 @@
+
+#define _POSIX_C_SOURCE 200809L
+
 #include "../inc/lexer.h"
 #include "../inc/ast.h"
 #include "../inc/parser.h" 
 #include "../inc/execution.h" 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <limits.h>
+
+
+
+
+void print_prompt(){ 
+    char hostname[HOST_NAME_MAX];
+    char cwd[PATH_MAX];
+    char *username = getenv("USER");
+
+    gethostname(hostname, HOST_NAME_MAX);
+    getcwd(cwd, PATH_MAX);
+
+    printf("\033[1;35m%s@%s\033[0m:\033[1;34m%s\033[0m$ ", username ? username : "user", hostname, cwd);
+    fflush(stdout);
+
+}
+
+
 
 void test_parser(const char *input) {
     printf("\n>>> Parsing: \"%s\"\n", input);
@@ -25,11 +49,37 @@ void test_parser(const char *input) {
 }
 
 int main() {
-    printf("=== MyBash Full Pipeline Test ===\n");
-    
-    test_parser("ls -la");
-    
+    char buffer[1024];
 
+    while(1){
+        print_prompt();
+
+        if (!fgets(buffer, sizeof(buffer), stdin)){
+            printf("\n");
+            break;
+        }
+
+        buffer[strcspn(buffer, "\n")] = 0;
+        if (strlen(buffer) == 0) continue;
+
+        Token *tokens = tokenize(buffer);
+        if (!tokens) continue;
+
+        ASTNode *ast = parse(tokens);
+        if (ast) {
+            execute(ast);
+            free_ast(ast);
+        }
+        
+        free_tokens(tokens);
+
+
+    }
+    // printf("=== MyBash Full Pipeline Test ===\n");
+    
+    // test_parser("ls -la");
+    
+    // test_parser("help");
     // test_parser("ls | grep .c");
     // test_parser("cat file | grep search | sort");
 
