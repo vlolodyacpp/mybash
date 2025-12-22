@@ -95,6 +95,9 @@ Token *tokenize(const char *input){
     size_t i = 0;
     while (i < len){
         while(is_space(input[i])) ++i;
+
+        if(input[i] == '#') break;
+
         if(i >= len) break;
 
         if(token_cnt >= capacity){
@@ -160,7 +163,7 @@ Token *tokenize(const char *input){
 
                 int count = 1;
                 for( ; input[i + count] != q; ++count); // len_word in "" or ''
-                int word_len = count + 1; // count + 1 - размер строки с кавычками, не учитывая послднего символа
+                int word_len = count - 1; // длинна слова
                                           
 
                 char *word = (char*)malloc((word_len + 1) * sizeof(char)); // учитываем последний символ, word_len - последняя позиция
@@ -168,14 +171,14 @@ Token *tokenize(const char *input){
                     perror("malloc error");
                     break;
                 }
-                strncpy(word, &input[i], word_len);
+                strncpy(word, &input[i + 1], word_len);
                 word[word_len] = '\0';
 
                 new_token = create_token(TOKEN_WORD_IN_QUOTES, word);
                 array_token[token_cnt++] = new_token;
                 free(word);
             
-                i += word_len;
+                i += (word_len + 1);
                 break;
             }
             case SIMPLE_WORD: {

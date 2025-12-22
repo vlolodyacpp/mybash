@@ -12,6 +12,7 @@ int execute(ASTNode*);
 int handle_redirection(Redirection *);
 int execute_command(ASTNode*);
 int execute_pipe(ASTNode*);
+int execute_pipe_stderr(ASTNode*);
 
 
 

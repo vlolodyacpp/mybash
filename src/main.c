@@ -10,9 +10,14 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <limits.h>
+#include <sys/wait.h>
+#include <signal.h>
 
+void sigchld_handler(int signum){
+    (void)signum;
 
-
+    while(waitpid(-1, NULL, WNOHANG) > 0);
+}
 
 void print_prompt(){ 
     char hostname[HOST_NAME_MAX];
@@ -49,6 +54,12 @@ void test_parser(const char *input) {
 }
 
 int main() {
+    struct sigaction sa;
+    sa.sa_handler = sigchld_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
+    sigaction(SIGCHLD, &sa, NULL);
+    
     char buffer[1024];
 
     while(1){
