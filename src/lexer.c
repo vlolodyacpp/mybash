@@ -8,7 +8,7 @@
 #define STANDART_CAPACITY 16
 
 
-const char word_delimeters[] = " \t;|&<>"; 
+const char word_delimeters[] = " \t;|&<>()"; 
 
 
 int is_delimiter(char c){
@@ -153,6 +153,12 @@ Token *tokenize(const char *input){
                 } else if (input[i] == ';') {
                     new_token = create_token(TOKEN_SEMICOL, ";");
                     i += 1;
+                } else if (input[i] == '(') {
+                    new_token = create_token(TOKEN_LPAREN, "(");
+                    i += 1;
+                } else if (input[i] == ')') {
+                    new_token = create_token(TOKEN_RPAREN, ")");
+                    i += 1;
                 } 
 
                 array_token[token_cnt++] = new_token;
@@ -162,7 +168,16 @@ Token *tokenize(const char *input){
                 char q = input[i];
 
                 int count = 1;
-                for( ; input[i + count] != q; ++count); // len_word in "" or ''
+                for( ; input[i + count] != q && input[i + 1] != '\0'; ++count); // len_word in "" or '''
+
+
+                if(input[i + 1] == '\0') { 
+                    fprintf(stderr, "syntax error"); // временное решение
+                    free_tokens(array_token);
+                    return NULL;
+                }
+
+
                 int word_len = count - 1; // длинна слова
                                           
 
@@ -178,7 +193,7 @@ Token *tokenize(const char *input){
                 array_token[token_cnt++] = new_token;
                 free(word);
             
-                i += (word_len + 1);
+                i += (word_len + 2);
                 break;
             }
             case SIMPLE_WORD: {

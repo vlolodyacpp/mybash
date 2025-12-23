@@ -20,29 +20,31 @@ ASTNode *parse_list(Token **curr){
     if(!left) return NULL;
 
     while(1){
-        if(match(curr, TOKEN_AMPER)){ // Обрабатываем случай &
+        if (match(curr, TOKEN_AMPER)){ // Обрабатываем случай &
+
             left = create_unary(NODE_BACKGROUND, left);
             if((*curr) -> type == TOKEN_EOF) return left;
-            if((*curr) -> type == TOKEN_SEMICOL) continue; // Игнорим ; после &
-
+            if((*curr) -> type == TOKEN_SEMICOL) (*curr)++; // Игнорим ; после &
 
             // Если все хорошо, соединяем через ;
-            ASTNode *right = parse_list(curr);
 
-            if(right){
-                left = create_binary(NODE_SEQUENCE, left, right);
+            if ((*curr)->type != TOKEN_EOF && (*curr)->type != TOKEN_RPAREN) {
+                ASTNode *right = parse_list(curr);
+                if (right){
+                    left = create_binary(NODE_SEQUENCE, left, right);
+                }
             }
 
             return left;
         } else if(match(curr, TOKEN_SEMICOL)){ // Обрабатываем случай ; 
 
-            if((*curr) -> type == TOKEN_EOF){
+            if ((*curr) -> type == TOKEN_EOF  || (*curr)->type == TOKEN_RPAREN){
                 return left;
             }
 
             ASTNode *right = parse_list(curr);
 
-            if(right){
+            if (right){
                 left = create_binary(NODE_SEQUENCE, left, right);
             }
             return left;
@@ -75,15 +77,16 @@ ASTNode *parse_logical(Token **curr){
     return left;
 
 }
+
 ASTNode *parse_pipeline(Token **curr){
-    ASTNode *left = parse_simple_command(curr);
+    ASTNode *left = parse_factor(curr);
     if (!left) return NULL;
 
     while ((*curr) -> type == TOKEN_PIPE || (*curr) -> type == TOKEN_PIPE_AMPER) { 
         TokenType op = (*curr) -> type;
         (*curr)++;
 
-        ASTNode *right = parse_simple_command(curr);
+        ASTNode *right = parse_factor(curr);
         if(!right){
             fprintf(stderr, "Syntax error: unknown command");
             free_ast(left);
@@ -97,6 +100,33 @@ ASTNode *parse_pipeline(Token **curr){
     return left;
 
 }
+
+ASTNode *parse_factor(Token **curr){
+
+    if((*curr) -> type == TOKEN_LPAREN) { 
+        (*curr)++;
+
+        ASTNode *inner = parse_list(curr);
+        if (!inner) {
+            fprintf(stderr, "error inside ()\n");
+            return NULL;
+        }
+        
+        if ((*curr)->type != TOKEN_RPAREN) {
+            fprintf(stderr, "Syntax error: expected ')'\n");
+            free_ast(inner);
+            return NULL;
+        }
+        (*curr)++;
+
+        return create_unary(NODE_SUB, inner);
+
+
+    }
+
+    return parse_simple_command(curr);
+}
+
 ASTNode *parse_simple_command(Token **curr) {
     // Если не слово и не перенаправление - это не команда
     if ((*curr) -> type != TOKEN_WORD && (*curr) -> type != TOKEN_WORD_IN_QUOTES && 
@@ -153,6 +183,8 @@ ASTNode *parse_simple_command(Token **curr) {
     argv[argc] = NULL;
     return create_command(argv, redir_head, argc);
 }
+
+
 
 int match(Token **curr, TokenType type){
     if((*curr) -> type == type){

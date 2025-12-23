@@ -5,6 +5,7 @@
 #include "../inc/ast.h"
 #include "../inc/parser.h" 
 #include "../inc/execution.h" 
+#include "../inc/jobs.h" 
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -13,11 +14,6 @@
 #include <sys/wait.h>
 #include <signal.h>
 
-void sigchld_handler(int signum){
-    (void)signum;
-
-    while(waitpid(-1, NULL, WNOHANG) > 0);
-}
 
 void print_prompt(){ 
     char hostname[HOST_NAME_MAX];
@@ -54,15 +50,13 @@ void test_parser(const char *input) {
 }
 
 int main() {
-    struct sigaction sa;
-    sa.sa_handler = sigchld_handler;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
-    sigaction(SIGCHLD, &sa, NULL);
+
+    init_shell();
     
     char buffer[1024];
 
     while(1){
+        check_background_jobs();
         print_prompt();
 
         if (!fgets(buffer, sizeof(buffer), stdin)){
@@ -79,6 +73,7 @@ int main() {
         ASTNode *ast = parse(tokens);
         if (ast) {
             execute(ast);
+
             free_ast(ast);
         }
         
@@ -86,7 +81,7 @@ int main() {
 
 
     }
-    // printf("=== MyBash Full Pipeline Test ===\n");
+
     
     // test_parser("ls -la");
     

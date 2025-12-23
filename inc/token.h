@@ -1,6 +1,6 @@
 #pragma once
 
-#define COUNT_DELIMITERS 7
+#define COUNT_DELIMITERS 9
 typedef enum {
     TOKEN_WORD, // def word or aguemenet/flag
     TOKEN_PIPE, // |
@@ -15,6 +15,8 @@ typedef enum {
     TOKEN_AND, // &&
     TOKEN_OR, // ||
     TOKEN_WORD_IN_QUOTES, // "/'
+    TOKEN_LPAREN, // (
+    TOKEN_RPAREN, // )
     TOKEN_EOF // ну тут и так понятно
 } TokenType;
 
