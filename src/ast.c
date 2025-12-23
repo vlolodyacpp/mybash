@@ -15,7 +15,6 @@ ASTNode *create_node(NodeType type){
 }
 
 
-// Создание самого нижнего уровня no comments
 ASTNode *create_command(char** argv, Redirection *redir, int argc){
     ASTNode *node = create_node(NODE_COMMAND);
     if(!node){
@@ -47,7 +46,7 @@ ASTNode *create_binary(NodeType type, ASTNode *left, ASTNode *right){
     return node;
 }
 
-// Унарный оператор 
+ 
 ASTNode *create_unary(NodeType type, ASTNode *child){
     ASTNode *node = create_node(type);
     if(!node){
@@ -62,7 +61,6 @@ ASTNode *create_unary(NodeType type, ASTNode *child){
 }
 
 
-// Добавление в список оператора перенаправления
 void add_redir(Redirection **head, RedirType rtype, const char *file){
 
     Redirection *redir = malloc(sizeof(Redirection));
@@ -87,7 +85,7 @@ void add_redir(Redirection **head, RedirType rtype, const char *file){
 
 //Вспомогательная для освобождение дерева
 
-void free_redirs(Redirection *redir){ 
+void free_redir(Redirection *redir){ 
     while(redir){
         Redirection *next = redir -> next;
         free(redir -> filename);
@@ -107,7 +105,7 @@ void free_ast(ASTNode *node){
                 free(node -> command.argv[i]);
             }
             free(node -> command.argv);
-            free_redirs(node -> command.redir);
+            free_redir(node -> command.redir);
             break;
 
         case NODE_PIPE:        

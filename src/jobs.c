@@ -136,21 +136,39 @@ void wait_for_job(Job *jobs_list) {
 }
 
 void check_background_jobs() {
-    int status;
-    pid_t pid;
 
-    while ((pid = waitpid(-1, &status, WNOHANG | WUNTRACED)) > 0) {
-        Job *job = find_job_by_pgid(pid);
-        if (job) {
-            if (WIFEXITED(status) || WIFSIGNALED(status)) {
-                printf("[%d] Done %s\n", job->id, job->command);
-                delete_job(pid);
-            }
-            else if (WIFSTOPPED(status)) {
+    Job *job = first_job;
+
+    while (job) { 
+        if (!job -> is_background) { 
+            job = job -> next;
+            continue;
+        }
+
+        int status;
+        pid_t pid;
+        int any_change = 0;
+
+        while ((pid = waitpid(-job->pgid, &status, WNOHANG | WUNTRACED)) > 0) {
+            any_change = 1;
+
+            if (WIFSTOPPED(status)) {
                 job->status = JOB_STOPPED;
-                printf("[%d]+ Stopped %s\n", job->id, job->command);
+            } else if (WIFCONTINUED(status)) {
+                job->status = JOB_RUNNING;
+            } else if (WIFEXITED(status) || WIFSIGNALED(status)) {
+                // не удаляем сразу: дождёмся, когда ECHILD подтвердит, что в группе никого не осталось
             }
         }
+
+        if (pid == -1 && errno == ECHILD) {
+            if (any_change) {
+                printf("[%d] Done %s\n", job->id, job->command);
+            }
+            delete_job(job->pgid);
+        }
+
+        job = job -> next;
     }
 }
 

@@ -100,7 +100,7 @@ Token *tokenize(const char *input){
 
         if(i >= len) break;
 
-        if(token_cnt >= capacity){
+        if(token_cnt >= capacity){ 
             capacity *= 2;
             Token *new_array = (Token*)realloc(array_token, capacity * sizeof(Token));
             if(!new_array){
@@ -166,51 +166,116 @@ Token *tokenize(const char *input){
 
             case WORD_IN_QUOTES: {
                 char q = input[i];
+                size_t j = i + 1;
 
-                int count = 1;
-                for( ; input[i + count] != q && input[i + 1] != '\0'; ++count); // len_word in "" or '''
+                size_t word_len = 0;
+                int closed = 0;
 
+                while (j < len) { 
+                    if (input[j] == '\\'){
+                        if (j + 1 >= len) {
+                            fprintf(stderr, "syntax error");
+                            free_tokens(array_token);
+                            return NULL;
+                        }
+                        j += 2;
+                        word_len += 1;
+                        continue;
+                    }
 
-                if(input[i + 1] == '\0') { 
-                    fprintf(stderr, "syntax error"); // временное решение
+                    if (input[j] == q) { 
+                        closed = 1;
+                        break;
+                    }
+
+                    j++;
+                    word_len++;
+                }
+
+                if(!closed) { 
+                    fprintf(stderr, "syntax error\n");
                     free_tokens(array_token);
                     return NULL;
                 }
-
-
-                int word_len = count - 1; // длинна слова
-                                          
-
+                                        
                 char *word = (char*)malloc((word_len + 1) * sizeof(char)); // учитываем последний символ, word_len - последняя позиция
                 if(!word){
                     perror("malloc error");
                     break;
                 }
-                strncpy(word, &input[i + 1], word_len);
-                word[word_len] = '\0';
+
+                size_t out = 0;
+                j = i + 1;
+                while (j < len && out < word_len) {
+                    if (input[j] == '\\') {
+                        // берём следующий символ “как есть”
+                        j++;
+                        word[out++] = input[j];
+                        j++;
+                        continue;
+                    }
+                    if (input[j] == q) break;
+                    word[out++] = input[j++];
+                }
+                word[out] = '\0';
 
                 new_token = create_token(TOKEN_WORD_IN_QUOTES, word);
                 array_token[token_cnt++] = new_token;
                 free(word);
             
-                i += (word_len + 2);
+                i += j + 1;
                 break;
             }
             case SIMPLE_WORD: {
-                int word_len = define_word_len(input, i);
-                char *word = (char*)malloc((word_len + 1) * sizeof(char));
-                if(!word){
-                    perror("malloc error");
-                    break;
+                size_t j = i;
+                size_t word_len = 0;
+
+                while (j < len) {
+                    if (is_space(input[j]) || is_delimiter(input[j])) break;
+
+                    if (input[j] == '\\') {
+                        if (j + 1 >= len) {
+                            fprintf(stderr, "syntax error: trailing \\\n");
+                            free_tokens(array_token);
+                            return NULL;
+                        }
+                        j += 2;
+                        word_len += 1;
+                        continue;
+                    }
+
+                    j++;
+                    word_len++;
                 }
-                strncpy(word, &input[i], word_len);
-                word[word_len] = '\0';
+
+                char *word = (char*)malloc((word_len + 1) * sizeof(char));
+                if (!word){
+                    perror("malloc error");
+                    free_tokens(array_token);
+                    return NULL;
+                }
+
+                size_t out = 0;
+                j = i;
+                while (j < len && out < word_len) {
+                    if (is_space(input[j]) || is_delimiter(input[j])) break;
+
+                    if (input[j] == '\\') {
+                        j++;
+                        word[out++] = input[j];
+                        j++;
+                        continue;
+                    }
+
+                    word[out++] = input[j++];
+                }
+                word[out] = '\0';
 
                 new_token = create_token(TOKEN_WORD, word);
                 array_token[token_cnt++] = new_token;
                 free(word);
 
-                i += word_len;
+                i = j;
                 break;
             }
             default:
