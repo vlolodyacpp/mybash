@@ -15,7 +15,6 @@ extern int shell_terminal;
 extern int shell_is_interactive;
 extern pid_t shell_pgid;
 
-// last status ($?) and last background pgid ($!)
 int g_last_status = 0;
 pid_t g_last_bg_pgid = 0;
 
@@ -238,7 +237,6 @@ int handle_redirection(Redirection *redir) {
     return 0;
 }
 
-// применяем редиректы для builtin в текущем процессе и откатываем
 int run_builtin_with_redir(ASTNode *node) {
     int saved_in = dup(STDIN_FILENO);
     int saved_out = dup(STDOUT_FILENO);
@@ -265,7 +263,6 @@ int run_builtin_with_redir(ASTNode *node) {
     return rc;
 }
 
-// простейшее расширение: только целиком аргумент вида $VAR / $? / $$ / $!
 void expand_argv(char **argv) {
     for (int i = 0; argv && argv[i]; i++) {
         if (argv[i][0] != '$') continue;
@@ -299,7 +296,6 @@ void expand_argv(char **argv) {
 }
 
 
-// execute без лишнего fork внутри пайпов/дочерних процессов
 
 
 int exec_command_in_child(ASTNode *node) {
