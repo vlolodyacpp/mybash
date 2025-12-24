@@ -1,4 +1,3 @@
-
 #include "../inc/lexer.h"
 #include "../inc/token.h"
 #include <stdio.h>
@@ -171,6 +170,8 @@ Token *tokenize(const char *input){
                 size_t word_len = 0;
                 int closed = 0;
 
+
+                //Первый проход считаем длину и проверяем на закрытые кавычки
                 while (j < len) { 
                     if (input[j] == '\\'){
                         if (j + 1 >= len) {
@@ -179,10 +180,11 @@ Token *tokenize(const char *input){
                             return NULL;
                         }
                         j += 2;
-                        word_len += 1;
+                        word_len += 1; // 
                         continue;
                     }
 
+                    // закрывающаящся кавычка
                     if (input[j] == q) { 
                         closed = 1;
                         break;
@@ -204,6 +206,7 @@ Token *tokenize(const char *input){
                     break;
                 }
 
+                // Второй проход - копирование с обработкой экранирования
                 size_t out = 0;
                 j = i + 1;
                 while (j < len && out < word_len) {
@@ -223,13 +226,14 @@ Token *tokenize(const char *input){
                 array_token[token_cnt++] = new_token;
                 free(word);
             
-                i += j + 1;
+                i = j + 1;
                 break;
             }
             case SIMPLE_WORD: {
                 size_t j = i;
                 size_t word_len = 0;
 
+                // первый проход для длинны слова
                 while (j < len) {
                     if (is_space(input[j]) || is_delimiter(input[j])) break;
 
@@ -255,6 +259,7 @@ Token *tokenize(const char *input){
                     return NULL;
                 }
 
+                // Аналогично с словами в кавычках
                 size_t out = 0;
                 j = i;
                 while (j < len && out < word_len) {
@@ -292,30 +297,3 @@ Token *tokenize(const char *input){
 }
 
 
-
-
-
-/*
-"||;dddfd&" - ||;dddfd&
-
-||*dddfd& - || ; dddfd &
-
-*/
-
-
-
-
-/*
-
-case bbrbr:
-    char *word[5];  BNONONONONNONONONONO
-
-case brbrbr: {
-    char *word[5];
-
-}
-
-
-
-
-*/

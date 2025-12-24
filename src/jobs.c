@@ -8,10 +8,13 @@
 #include <errno.h>
 #include <fcntl.h>
 
+// голова связного списка фоновых заданий
 Job *first_job = NULL;
+
+// Параметры шелла для управления заданиями
 pid_t shell_pgid;
-int shell_terminal;
-int shell_is_interactive;
+int shell_terminal;            
+int shell_is_interactive;    
 
 
 void init_shell() {
@@ -30,15 +33,17 @@ void init_shell() {
         signal(SIGTTOU, SIG_IGN);
 
 
-        shell_pgid = getpid();
-        if(setpgid(shell_pgid, shell_pgid) < 0){
+        shell_pgid = getpid(); // pgid = pid
+        if(setpgid(shell_pgid, shell_pgid) < 0){ // назначаем себя лидером группы
             perror("error setpgid");
             exit(1);
         }
 
+        // захватываем терминал
         tcsetpgrp(shell_terminal, shell_pgid);
     }
 }
+
 
 void add_job(pid_t pgid, const char *command, JobStatus status, int is_bg) {
 
@@ -110,6 +115,7 @@ Job *find_job_by_id(int id) {
     return NULL;
 }
 
+
 void wait_for_job(Job *jobs_list) { 
     int status;
     pid_t pid;
@@ -134,6 +140,7 @@ void wait_for_job(Job *jobs_list) {
         delete_job(jobs_list -> pgid);
     }
 }
+
 
 void check_background_jobs() {
 
@@ -170,56 +177,4 @@ void check_background_jobs() {
 
         job = job -> next;
     }
-}
-
-int builtin_fg(char **args) {
-    if (!args[1]) {
-        fprintf(stderr, "fg: usage: fg <job_id>\n");
-        return 1;
-    }
-    
-    int job_id = atoi(args[1]); 
-    Job *jobs_list = find_job_by_id(job_id);
-    if (!jobs_list) {
-        fprintf(stderr, "fg: job not found: %s\n", args[1]);
-        return 1;
-    }
-
-    jobs_list -> is_background = 0;
-
-    tcsetpgrp(shell_terminal, jobs_list->pgid);
-
-
-    if (jobs_list->status == JOB_STOPPED) {
-        kill(-jobs_list->pgid, SIGCONT);
-        jobs_list->status = JOB_RUNNING;
-    }
-
-
-    wait_for_job(jobs_list);
-
-   
-    tcsetpgrp(shell_terminal, shell_pgid);
-    return 0;
-}
-
-int builtin_bg(char **args) {
-    if (!args[1]) {
-        fprintf(stderr, "bg: usage: bg <job_id>\n");
-        return 1;
-    }
-
-    int job_id = atoi(args[1]);
-    Job *jobs_list = find_job_by_id(job_id);
-    if (!jobs_list) {
-        fprintf(stderr, "bg: job not found\n");
-        return 1;
-    }
-
-    if (jobs_list -> status == JOB_STOPPED) {
-        kill(-jobs_list->pgid, SIGCONT);
-        jobs_list -> status = JOB_RUNNING;
-        printf("[%d]+ %s &\n", jobs_list -> id, jobs_list -> command);
-    }
-    return 0;
 }
