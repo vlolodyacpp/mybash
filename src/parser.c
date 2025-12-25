@@ -67,7 +67,6 @@ ASTNode *parse_logical(Token **curr){
 
     if(!left) return NULL;
 
-    // Цикл для обработки цепочки логических операторов
     while ((*curr) -> type == TOKEN_AND || (*curr) -> type == TOKEN_OR){
         TokenType op = (*curr) -> type;
         (*curr)++; // Пропускаем оператор && или ||

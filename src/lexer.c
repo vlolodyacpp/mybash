@@ -8,7 +8,7 @@
 
 
 const char word_delimeters[] = " \t;|&<>()"; 
-
+int g_unclosed_quote = 0;
 
 int is_delimiter(char c){
     for(int i = 0; i < COUNT_DELIMITERS; ++i){
@@ -43,10 +43,11 @@ int define_word_len(const char* word, int offset){
 void free_tokens(Token *array_token) {
     if (!array_token) return;
     int i;
-    for (i = 0; array_token[i].type != TOKEN_EOF; i++) {
-        free(array_token[i].value);
+    for (i = 0; array_token[i].type != TOKEN_EOF && array_token[i].value != NULL; i++) {
+        if (array_token[i].value) { 
+            free(array_token[i].value);
+        }
     }
-    free(array_token[i].value);
     free(array_token);
 }
 
@@ -90,6 +91,8 @@ Token *tokenize(const char *input){
         perror("malloc error");
         return NULL;
     }
+
+    g_unclosed_quote = 0;
 
     size_t i = 0;
     while (i < len){
@@ -175,7 +178,9 @@ Token *tokenize(const char *input){
                 while (j < len) { 
                     if (input[j] == '\\'){
                         if (j + 1 >= len) {
-                            fprintf(stderr, "syntax error");
+                            g_unclosed_quote = 1;
+                            array_token[token_cnt].type = TOKEN_EOF;
+                            array_token[token_cnt].value = NULL;
                             free_tokens(array_token);
                             return NULL;
                         }
@@ -195,7 +200,9 @@ Token *tokenize(const char *input){
                 }
 
                 if(!closed) { 
-                    fprintf(stderr, "syntax error\n");
+                    g_unclosed_quote = 1;
+                    array_token[token_cnt].type = TOKEN_EOF;
+                    array_token[token_cnt].value = NULL;
                     free_tokens(array_token);
                     return NULL;
                 }
@@ -227,6 +234,13 @@ Token *tokenize(const char *input){
                 free(word);
             
                 i = j + 1;
+                if (i < len && !is_space(input[i]) && !is_delimiter(input[i])) {
+
+                    fprintf(stderr, "Syntax error: concatenation not supported yet\n");
+                    free_tokens(array_token);
+                    return NULL;
+                }
+            
                 break;
             }
             case SIMPLE_WORD: {
@@ -291,7 +305,8 @@ Token *tokenize(const char *input){
 
 
     }
-    array_token[token_cnt++] = create_token(TOKEN_EOF, "EOF");
+    array_token[token_cnt].type = TOKEN_EOF;
+    array_token[token_cnt].value = NULL;
 
     return array_token;
 }
