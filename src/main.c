@@ -6,6 +6,7 @@
 #include "../inc/parser.h" 
 #include "../inc/execution.h" 
 #include "../inc/jobs.h" 
+#include "../inc/builtin.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -49,7 +50,7 @@ void test_parser(const char *input) {
 
     free_tokens(tokens);
 }
-static char *read_command_line(void) {
+char *read_command_line(void) {
     char *curr_line = NULL;
     size_t line_buf_size = 0;
 
@@ -160,6 +161,7 @@ static char *read_command_line(void) {
 int main() {
 
     init_shell();
+    int exit_code = 0;
 
     while(1){
         check_background_jobs();
@@ -183,18 +185,23 @@ int main() {
  
         if (!tokens) continue;
 
-        print_tokens(tokens);
+        //print_tokens(tokens);
 
 
         ASTNode *ast = parse(tokens);
         if (ast) {
-            print_ast(ast);
+            //print_ast(ast);
             execute(ast);
 
             free_ast(ast);
         }
         
         free_tokens(tokens);
+
+        if (shell_exit_requested()) {
+            exit_code = shell_exit_code();
+            break;
+        }
 
 
     }
@@ -220,5 +227,5 @@ int main() {
     // test_parser("gcc main.c -o main && ./main | grep output > result.txt || echo error");
 
     
-    return 0;
+    return exit_code;
 }

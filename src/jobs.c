@@ -147,16 +147,19 @@ void check_background_jobs() {
     Job *job = first_job;
 
     while (job) { 
+        Job *next_job = job->next;
+
         if (!job -> is_background) { 
-            job = job -> next;
+            job = next_job;
             continue;
         }
 
         int status;
         pid_t pid;
         int any_change = 0;
+        int should_delete = 0;
 
-        while ((pid = waitpid(-job->pgid, &status, WNOHANG | WUNTRACED)) > 0) {
+        while ((pid = waitpid(-job->pgid, &status, WNOHANG | WUNTRACED | WCONTINUED)) > 0) {
             any_change = 1;
 
             if (WIFSTOPPED(status)) {
@@ -172,9 +175,13 @@ void check_background_jobs() {
             if (any_change) {
                 printf("[%d] Done %s\n", job->id, job->command);
             }
+            should_delete = 1;
+        }
+
+        if (should_delete) {
             delete_job(job->pgid);
         }
 
-        job = job -> next;
+        job = next_job;
     }
 }

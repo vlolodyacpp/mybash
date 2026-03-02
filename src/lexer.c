@@ -16,7 +16,7 @@ typedef struct {
 } OperatorDef;
 
 int match_greedy_operator(const char *input, size_t pos, size_t len, Token *out_token, size_t *matched_len) {
-    static const OperatorDef ops[] = {
+    const OperatorDef ops[] = {
         {"&>>", TOKEN_AMPER_REDIR_APPEND},
         {"|&", TOKEN_PIPE_AMPER},
         {"||", TOKEN_OR},

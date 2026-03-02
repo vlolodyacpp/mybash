@@ -27,6 +27,10 @@ int is_valid_var_name(const char *, size_t);
 int builtin_set(char **);
 int builtin_unset(char **);
 
+void request_shell_exit(int code);
+int shell_exit_requested(void);
+int shell_exit_code(void);
+
 int run_builtin(char **);
 int run_builtin_with_redir(ASTNode *);
 

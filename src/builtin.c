@@ -11,10 +11,109 @@
 #include <string.h>
 #include <errno.h>
 #include <ctype.h>
+#include <limits.h>
 
 extern Job *first_job;
 extern pid_t shell_pgid;              
 extern int shell_terminal;
+extern int g_last_status;
+
+static int g_shell_exit_requested = 0;
+static int g_shell_exit_code = 0;
+
+void request_shell_exit(int code) {
+    g_shell_exit_requested = 1;
+    g_shell_exit_code = code;
+}
+
+int shell_exit_requested(void) {
+    return g_shell_exit_requested;
+}
+
+int shell_exit_code(void) {
+    return g_shell_exit_code;
+}
+
+int parse_job_id_arg(const char *arg) {
+    if (!arg || !*arg) return -1;
+
+    const char *p = arg;
+    if (*p == '%') p++;
+    if (!*p) return -1;
+
+    for (const char *it = p; *it; ++it) {
+        if (!isdigit((unsigned char)*it)) return -1;
+    }
+
+    int id = atoi(p);
+    return (id > 0) ? id : -1;
+}
+
+Job *find_last_stopped_job(void) {
+    Job *best = NULL;
+    for (Job *j = first_job; j; j = j->next) {
+        if (j->status != JOB_STOPPED) continue;
+        if (!best || j->id > best->id) best = j;
+    }
+    return best;
+}
+
+int signal_from_name(const char *name) {
+    if (!name || !*name) return -1;
+
+    const char *n = name;
+    if (strncasecmp(n, "SIG", 3) == 0) {
+        n += 3;
+    }
+
+    if (strcasecmp(n, "HUP") == 0) return SIGHUP;
+    if (strcasecmp(n, "INT") == 0) return SIGINT;
+    if (strcasecmp(n, "QUIT") == 0) return SIGQUIT;
+    if (strcasecmp(n, "KILL") == 0) return SIGKILL;
+    if (strcasecmp(n, "TERM") == 0) return SIGTERM;
+    if (strcasecmp(n, "STOP") == 0) return SIGSTOP;
+    if (strcasecmp(n, "TSTP") == 0) return SIGTSTP;
+    if (strcasecmp(n, "CONT") == 0) return SIGCONT;
+    if (strcasecmp(n, "TTIN") == 0) return SIGTTIN;
+    if (strcasecmp(n, "TTOU") == 0) return SIGTTOU;
+    if (strcasecmp(n, "CHLD") == 0) return SIGCHLD;
+
+    return -1;
+}
+
+int parse_signal_spec(const char *spec) {
+    if (!spec || !*spec) return -1;
+
+    int all_digits = 1;
+    for (const char *p = spec; *p; ++p) {
+        if (!isdigit((unsigned char)*p)) {
+            all_digits = 0;
+            break;
+        }
+    }
+
+    if (all_digits) {
+        int sig = atoi(spec);
+        return (sig > 0) ? sig : -1;
+    }
+
+    return signal_from_name(spec);
+}
+
+void update_job_status_after_signal(Job *job, int sig) {
+    if (!job) return;
+
+    if (sig == SIGCONT) {
+        job->status = JOB_RUNNING;
+        job->is_background = 1;
+        return;
+    }
+
+    if (sig == SIGSTOP || sig == SIGTSTP || sig == SIGTTIN || sig == SIGTTOU) {
+        job->status = JOB_STOPPED;
+        job->is_background = 1;
+    }
+}
 
 
 
@@ -52,23 +151,59 @@ int is_builtin(const char *s) {
 }     
 
 int builtin_cd(char **argv) {
-    // argv[0] = "cd", argv[1] = путь (или NULL)
-    const char *path = argv[1] ? argv[1] : getenv("HOME");
-    if (!path) {
-        fprintf(stderr, "cd: HOME not set\n");
+    char oldcwd[PATH_MAX];
+    char newcwd[PATH_MAX];
+
+    if (!getcwd(oldcwd, sizeof(oldcwd))) {
+        perror("cd/getcwd");
         return 1;
     }
+
+    const char *path = NULL;
+    if (!argv[1]) {
+        path = getenv("HOME");
+    } else if (strcmp(argv[1], "-") == 0) {
+        path = getenv("OLDPWD");
+        if (path) {
+            printf("%s\n", path);
+        }
+    } else {
+        path = argv[1];
+    }
+
+    if (!path) {
+        fprintf(stderr, "cd: %s not set\n", argv[1] && strcmp(argv[1], "-") == 0 ? "OLDPWD" : "HOME");
+        return 1;
+    }
+
     if (chdir(path) != 0) {
         perror("cd");
         return 1;
     }
+
+    if (setenv("OLDPWD", oldcwd, 1) != 0) {
+        perror("setenv");
+        return 1;
+    }
+
+    if (!getcwd(newcwd, sizeof(newcwd))) {
+        perror("cd/getcwd");
+        return 1;
+    }
+
+    if (setenv("PWD", newcwd, 1) != 0) {
+        perror("setenv");
+        return 1;
+    }
+
     return 0;
 }
 
 int builtin_exit(char **argv) {
     // argv[1] может содержать код выхода
-    int code = argv[1] ? atoi(argv[1]) : 0;
-    exit(code);
+    int code = argv[1] ? atoi(argv[1]) : g_last_status;
+    request_shell_exit(code);
+    return code;
 }
 
 int builtin_echo(char **argv) {
@@ -128,7 +263,7 @@ int builtin_kill(char **argv) {
 
     // Парсинг номера сигнала
     if (argv[1][0] == '-' && argv[1][1] != '\0') {
-        sig = atoi(argv[1] + 1);
+        sig = parse_signal_spec(argv[1] + 1);
         if (sig <= 0) {
             fprintf(stderr, "kill: bad signal: %s\n", argv[1]);
             return 1;
@@ -158,6 +293,8 @@ int builtin_kill(char **argv) {
             perror("kill");
             return 1;
         }
+
+        update_job_status_after_signal(j, sig);
         return 0;
     }
 
@@ -170,6 +307,16 @@ int builtin_kill(char **argv) {
         perror("kill");
         return 1;
     }
+
+    Job *j = find_job_by_pgid(pid);
+    if (!j) {
+        pid_t target_pgid = getpgid(pid);
+        if (target_pgid > 0) {
+            j = find_job_by_pgid(target_pgid);
+        }
+    }
+    update_job_status_after_signal(j, sig);
+
     return 0;
 }
 
@@ -289,13 +436,23 @@ int run_builtin_with_redir(ASTNode *node) {
 }
 
 int builtin_fg(char **args) {
+    Job *jobs_list = NULL;
+
     if (!args[1]) {
-        fprintf(stderr, "fg: usage: fg <job_id>\n");
-        return 1;
+        jobs_list = find_last_stopped_job();
+        if (!jobs_list) {
+            fprintf(stderr, "fg: no current job\n");
+            return 1;
+        }
+    } else {
+        int job_id = parse_job_id_arg(args[1]);
+        if (job_id <= 0) {
+            fprintf(stderr, "fg: job not found: %s\n", args[1]);
+            return 1;
+        }
+        jobs_list = find_job_by_id(job_id);
     }
-    
-    int job_id = atoi(args[1]); 
-    Job *jobs_list = find_job_by_id(job_id);
+
     if (!jobs_list) {
         fprintf(stderr, "fg: job not found: %s\n", args[1]);
         return 1;
@@ -320,13 +477,23 @@ int builtin_fg(char **args) {
 }
 
 int builtin_bg(char **args) {
+    Job *jobs_list = NULL;
+
     if (!args[1]) {
-        fprintf(stderr, "bg: usage: bg <job_id>\n");
-        return 1;
+        jobs_list = find_last_stopped_job();
+        if (!jobs_list) {
+            fprintf(stderr, "bg: no current job\n");
+            return 1;
+        }
+    } else {
+        int job_id = parse_job_id_arg(args[1]);
+        if (job_id <= 0) {
+            fprintf(stderr, "bg: job not found\n");
+            return 1;
+        }
+        jobs_list = find_job_by_id(job_id);
     }
 
-    int job_id = atoi(args[1]);
-    Job *jobs_list = find_job_by_id(job_id);
     if (!jobs_list) {
         fprintf(stderr, "bg: job not found\n");
         return 1;
