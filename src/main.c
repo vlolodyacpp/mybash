@@ -56,9 +56,10 @@ static char *read_command_line(void) {
     char *accum_input = NULL;
     size_t accum_len = 0;
     int first_line = 1;
+    int join_without_newline = 0;
 
     while (1) {
-        // Показываем приглашение
+        // показываем приглашение
         if (!first_line) {
             printf("> ");
             fflush(stdout);
@@ -66,15 +67,20 @@ static char *read_command_line(void) {
 
         ssize_t n = getline(&curr_line, &line_buf_size, stdin);
         if (n < 0) {
+            if (accum_len > 0) {
+                clearerr(stdin);
+                printf("\n");
+                first_line = 0;
+                continue;
+            }
             free(curr_line);
             free(accum_input);
-            return NULL; // EOF
+            return NULL;
         }
 
-        // убрать \n
         if (n > 0 && curr_line[n-1] == '\n') curr_line[n-1] = '\0';
 
-        // Проверка на backslash continuation
+        // проверка continuation
         size_t L = strlen(curr_line);
         int cont = (L > 0 && curr_line[L-1] == '\\');
         if (cont) curr_line[L-1] = '\0';
@@ -82,7 +88,7 @@ static char *read_command_line(void) {
         size_t add = strlen(curr_line);
         
         // вычисляем нужный размер
-        size_t need_newline = (accum_len > 0 && !first_line) ? 1 : 0;
+        size_t need_newline = (accum_len > 0 && !first_line && !join_without_newline) ? 1 : 0;
         char *new_accum = realloc(accum_input, accum_len + add + need_newline + 1);
         if (!new_accum) {
             free(curr_line);
@@ -91,7 +97,6 @@ static char *read_command_line(void) {
         }
         accum_input = new_accum;
 
-        //\n перед копированием новой строки
         if (need_newline) {
             accum_input[accum_len] = '\n';
             accum_len++;
@@ -101,31 +106,48 @@ static char *read_command_line(void) {
         accum_len += add;
         accum_input[accum_len] = '\0';
 
-        // Если был backslash - продолжаем ввод
         if (cont) {
             first_line = 0;
+            join_without_newline = 1;
             continue;
         }
 
-                
-        // Пробуем токенизировать
+        join_without_newline = 0;
+
+        
         Token *test_tokens = tokenize(accum_input);
                 
         if (!test_tokens) {
             if (g_unclosed_quote) {
-                // Незакрытые кавычки - продолжаем ввод
                 first_line = 0;
                 continue;
             } else {
-                // Другая ошибка
                 free(curr_line);
                 free(accum_input);
                 return NULL;
             }
         }
 
-        // Токены получены успешно
+        int needs_continuation = 0;
+        int last_meaningful = -1;
+        for (int ti = 0; test_tokens[ti].type != TOKEN_EOF; ti++) {
+            last_meaningful = ti;
+        }
+        if (last_meaningful >= 0) {
+            TokenType lt = test_tokens[last_meaningful].type;
+            if (lt == TOKEN_PIPE || lt == TOKEN_PIPE_AMPER ||
+                lt == TOKEN_OR  || lt == TOKEN_AND) {
+                needs_continuation = 1;
+            }
+        }
+
         free_tokens(test_tokens);
+
+        if (needs_continuation) {
+            first_line = 0;
+            join_without_newline = 0;
+            continue;
+        }
    
         break;
     }

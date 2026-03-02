@@ -19,7 +19,7 @@ int is_delimiter(char c){
 
 
 int is_space(char c){
-    return c == ' ' || c == '\t' || c == '\n';
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r';
 }
 
 
@@ -166,128 +166,123 @@ Token *tokenize(const char *input){
                 array_token[token_cnt++] = new_token;
                 break;          
 
-            case WORD_IN_QUOTES: {
-                char q = input[i];
-                size_t j = i + 1;
+            case WORD_IN_QUOTES:
+            case SIMPLE_WORD: {
+                size_t j = i;
+                size_t word_cap = 32;
+                size_t out = 0;
+                char *word = (char*)malloc(word_cap);
+                if (!word) {
+                    perror("malloc error");
+                    free_tokens(array_token);
+                    return NULL;
+                }
 
-                size_t word_len = 0;
-                int closed = 0;
+                while (j < len && !is_space(input[j]) && !is_delimiter(input[j])) {
+                    if (input[j] == '"' || input[j] == '\'') {
+                        char q = input[j++];
+                        int closed = 0;
 
+                        while (j < len) {
+                            if (input[j] == '\\') {
+                                if (j + 1 >= len) {
+                                    g_unclosed_quote = 1;
+                                    free(word);
+                                    array_token[token_cnt].type = TOKEN_EOF;
+                                    array_token[token_cnt].value = NULL;
+                                    free_tokens(array_token);
+                                    return NULL;
+                                }
 
-                //Первый проход считаем длину и проверяем на закрытые кавычки
-                while (j < len) { 
-                    if (input[j] == '\\'){
-                        if (j + 1 >= len) {
+                                if (out + 2 > word_cap) {
+                                    word_cap *= 2;
+                                    char *new_word = (char*)realloc(word, word_cap);
+                                    if (!new_word) {
+                                        perror("realloc error");
+                                        free(word);
+                                        free_tokens(array_token);
+                                        return NULL;
+                                    }
+                                    word = new_word;
+                                }
+
+                                word[out++] = input[j + 1];
+                                j += 2;
+                                continue;
+                            }
+
+                            if (input[j] == q) {
+                                closed = 1;
+                                j++;
+                                break;
+                            }
+
+                            if (out + 2 > word_cap) {
+                                word_cap *= 2;
+                                char *new_word = (char*)realloc(word, word_cap);
+                                if (!new_word) {
+                                    perror("realloc error");
+                                    free(word);
+                                    free_tokens(array_token);
+                                    return NULL;
+                                }
+                                word = new_word;
+                            }
+                            word[out++] = input[j++];
+                        }
+
+                        if (!closed) {
                             g_unclosed_quote = 1;
+                            free(word);
                             array_token[token_cnt].type = TOKEN_EOF;
                             array_token[token_cnt].value = NULL;
                             free_tokens(array_token);
                             return NULL;
                         }
-                        j += 2;
-                        word_len += 1; // 
+
                         continue;
                     }
-
-                    // закрывающаящся кавычка
-                    if (input[j] == q) { 
-                        closed = 1;
-                        break;
-                    }
-
-                    j++;
-                    word_len++;
-                }
-
-                if(!closed) { 
-                    g_unclosed_quote = 1;
-                    array_token[token_cnt].type = TOKEN_EOF;
-                    array_token[token_cnt].value = NULL;
-                    free_tokens(array_token);
-                    return NULL;
-                }
-                                        
-                char *word = (char*)malloc((word_len + 1) * sizeof(char)); // учитываем последний символ, word_len - последняя позиция
-                if(!word){
-                    perror("malloc error");
-                    break;
-                }
-
-                // Второй проход - копирование с обработкой экранирования
-                size_t out = 0;
-                j = i + 1;
-                while (j < len && out < word_len) {
-                    if (input[j] == '\\') {
-                        // берём следующий символ “как есть”
-                        j++;
-                        word[out++] = input[j];
-                        j++;
-                        continue;
-                    }
-                    if (input[j] == q) break;
-                    word[out++] = input[j++];
-                }
-                word[out] = '\0';
-
-                new_token = create_token(TOKEN_WORD_IN_QUOTES, word);
-                array_token[token_cnt++] = new_token;
-                free(word);
-            
-                i = j + 1;
-                if (i < len && !is_space(input[i]) && !is_delimiter(input[i])) {
-
-                    fprintf(stderr, "Syntax error: concatenation not supported yet\n");
-                    free_tokens(array_token);
-                    return NULL;
-                }
-            
-                break;
-            }
-            case SIMPLE_WORD: {
-                size_t j = i;
-                size_t word_len = 0;
-
-                // первый проход для длинны слова
-                while (j < len) {
-                    if (is_space(input[j]) || is_delimiter(input[j])) break;
 
                     if (input[j] == '\\') {
                         if (j + 1 >= len) {
-                            fprintf(stderr, "syntax error: trailing \\\n");
+                            fprintf(stderr, "syntax error: trailing \n");
+                            free(word);
                             free_tokens(array_token);
                             return NULL;
                         }
+
+                        if (out + 2 > word_cap) {
+                            word_cap *= 2;
+                            char *new_word = (char*)realloc(word, word_cap);
+                            if (!new_word) {
+                                perror("realloc error");
+                                free(word);
+                                free_tokens(array_token);
+                                return NULL;
+                            }
+                            word = new_word;
+                        }
+
+                        word[out++] = input[j + 1];
                         j += 2;
-                        word_len += 1;
                         continue;
                     }
 
-                    j++;
-                    word_len++;
-                }
-
-                char *word = (char*)malloc((word_len + 1) * sizeof(char));
-                if (!word){
-                    perror("malloc error");
-                    free_tokens(array_token);
-                    return NULL;
-                }
-
-                // Аналогично с словами в кавычках
-                size_t out = 0;
-                j = i;
-                while (j < len && out < word_len) {
-                    if (is_space(input[j]) || is_delimiter(input[j])) break;
-
-                    if (input[j] == '\\') {
-                        j++;
-                        word[out++] = input[j];
-                        j++;
-                        continue;
+                    if (out + 2 > word_cap) {
+                        word_cap *= 2;
+                        char *new_word = (char*)realloc(word, word_cap);
+                        if (!new_word) {
+                            perror("realloc error");
+                            free(word);
+                            free_tokens(array_token);
+                            return NULL;
+                        }
+                        word = new_word;
                     }
 
                     word[out++] = input[j++];
                 }
+
                 word[out] = '\0';
 
                 new_token = create_token(TOKEN_WORD, word);

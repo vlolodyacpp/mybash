@@ -626,7 +626,7 @@ int execute_command(ASTNode *node) {
 
         execvp(argv[0], argv);
         
-        fprintf(stderr, "%s: command not found\\n", argv[0]);
+        fprintf(stderr, "%s: command not found\n", argv[0]);
         _exit(127); 
 
     } else if (pid > 0) {  // Код родительского процесса (shell)
