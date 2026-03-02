@@ -8,7 +8,7 @@
 
 
 int handle_redirection(Redirection *);
-void expand_argv(char **);
+void expand_argv(char **, int *);
 int exec_command_in_child(ASTNode *);
 int flatten_pipeline(ASTNode *,ASTNode ***, int **, int *);
 int wait_foreground_pgid(pid_t, pid_t);

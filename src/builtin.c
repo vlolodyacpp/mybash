@@ -1,15 +1,21 @@
 #include "../inc/builtin.h"
 #include "../inc/execution.h"
 #include "../inc/jobs.h"
+#include <signal.h>
+#include <termios.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <signal.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <sys/wait.h>
+#include <string.h>
+#include <errno.h>
+#include <ctype.h>
 
 extern Job *first_job;
 extern pid_t shell_pgid;              
 extern int shell_terminal;
+
 
 
 const char *job_status_str(JobStatus st) {
@@ -167,32 +173,52 @@ int builtin_kill(char **argv) {
     return 0;
 }
 
+int is_valid_var_name(const char *name, size_t len) {
+    if (!name || len == 0) return 0;
+    if (!(isalpha((unsigned char)name[0]) || name[0] == '_')) return 0;
+    for (size_t i = 1; i < len; ++i) {
+        if (!(isalnum((unsigned char)name[i]) || name[i] == '_')) return 0;
+    }
+    return 1;
+}
+
+
 int builtin_set(char **argv) {
-    // set VAR=value
+    // set VAR=value [VAR2=value2 ...]
     if (!argv[1]) {
         fprintf(stderr, "set: usage: set VAR=value\n");
         return 1;
     }
 
-    char *eq = strchr(argv[1], '=');
+    for (int i = 1; argv[i]; ++i) {
 
-    if (!eq || eq == argv[1]) {
-        fprintf(stderr, "set: usage: set VAR=value\n");
-        return 1;
+        const char *eq = strchr(argv[i], '=');
+        if (!eq || eq == argv[i]) {
+            fprintf(stderr, "set: usage: set VAR=value [VAR2=value2 ...]\n");
+            return 1;
+        }
+
+        size_t name_len = (size_t)(eq - argv[i]);
+        if (!is_valid_var_name(argv[i], name_len)) {
+            fprintf(stderr, "set: usage: set VAR=value [VAR2=value2 ...]\n");
+            return 1;
+        }
+
+        char *name = strndup(argv[i], name_len);
+        if (!name) {
+            perror("strndup");
+            return 1;
+        }
+
+        const char *value = eq + 1;
+        int rc = setenv(name, value, 1);
+        free(name);
+        if (rc != 0) {
+            perror("setenv");
+            return 1;
+        }
     }
 
-    //разделяем строку для взятия аргумента и значения
-    *eq = '\0';
-    const char *name = argv[1];
-    const char *val = eq + 1;
-
-    int rc = setenv(name, val, 1);
-    *eq = '=';
-
-    if (rc != 0) {
-        perror("setenv");
-        return 1;
-    }
     return 0;
 }
 
@@ -207,6 +233,8 @@ int builtin_unset(char **argv) {
     }
     return 0;
 }
+
+
 
 int run_builtin(char **argv) {
     if (strcmp(argv[0], "cd") == 0)     return builtin_cd(argv);

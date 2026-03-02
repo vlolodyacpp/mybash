@@ -15,7 +15,7 @@ ASTNode *create_node(NodeType type){
 }
 
 
-ASTNode *create_command(char** argv, Redirection *redir, int argc){
+ASTNode *create_command(char** argv, int *arg_no_expand, Redirection *redir, int argc){
     ASTNode *node = create_node(NODE_COMMAND);
     if(!node){
         perror("malloc error");
@@ -25,6 +25,7 @@ ASTNode *create_command(char** argv, Redirection *redir, int argc){
 
     node -> command.argc = argc;
     node -> command.argv = argv;
+    node -> command.arg_no_expand = arg_no_expand;
     node -> command.redir = redir;
 
 
@@ -105,6 +106,7 @@ void free_ast(ASTNode *node){
                 free(node -> command.argv[i]);
             }
             free(node -> command.argv);
+            free(node -> command.arg_no_expand);
             free_redir(node -> command.redir);
             break;
 

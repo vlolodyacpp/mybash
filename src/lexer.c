@@ -10,6 +10,52 @@
 const char word_delimeters[] = " \t;|&<>()"; 
 int g_unclosed_quote = 0;
 
+typedef struct {
+    const char *lexeme;
+    TokenType type;
+} OperatorDef;
+
+int match_greedy_operator(const char *input, size_t pos, size_t len, Token *out_token, size_t *matched_len) {
+    static const OperatorDef ops[] = {
+        {"&>>", TOKEN_AMPER_REDIR_APPEND},
+        {"|&", TOKEN_PIPE_AMPER},
+        {"||", TOKEN_OR},
+        {"&&", TOKEN_AND},
+        {">>", TOKEN_REDIR_APPEND},
+        {"&>", TOKEN_AMPER_REDIR_IN},
+        {"|", TOKEN_PIPE},
+        {"&", TOKEN_AMPER},
+        {"<", TOKEN_REDIR_IN},
+        {">", TOKEN_REDIR_OUT},
+        {";", TOKEN_SEMICOL},
+        {"(", TOKEN_LPAREN},
+        {")", TOKEN_RPAREN},
+    };
+
+    size_t best_idx = (size_t)-1;
+    size_t best_len = 0;
+    size_t ops_count = sizeof(ops) / sizeof(ops[0]);
+
+    for (size_t op_idx = 0; op_idx < ops_count; ++op_idx) {
+        size_t op_len = strlen(ops[op_idx].lexeme);
+        if (pos + op_len > len) {
+            continue;
+        }
+        if (strncmp(input + pos, ops[op_idx].lexeme, op_len) == 0 && op_len > best_len) {
+            best_idx = op_idx;
+            best_len = op_len;
+        }
+    }
+
+    if (best_idx == (size_t)-1) {
+        return 0;
+    }
+
+    *out_token = create_token(ops[best_idx].type, (char *)ops[best_idx].lexeme);
+    *matched_len = best_len;
+    return 1;
+}
+
 int is_delimiter(char c){
     for(int i = 0; i < COUNT_DELIMITERS; ++i){
         if(c == word_delimeters[i]) return 1;
@@ -52,7 +98,7 @@ void free_tokens(Token *array_token) {
 }
 
 
-void print(Token *array_token) {
+void print_tokens(Token *array_token) {
     printf("=== TOKENS ===:\n");
     for (int i = 0; array_token[i].type != TOKEN_EOF; ++i) {
         printf("%d - %s\n", array_token[i].type, array_token[i].value ? array_token[i].value : "(null)");
@@ -118,52 +164,15 @@ Token *tokenize(const char *input){
         SimpleWord type = define_simple_word(input[i]);
         switch(type){
             case DELIMETERS:
-        
-                if (input[i] == '&' && input[i+1] == '>' && input[i+2] == '>') {
-                    new_token = create_token(TOKEN_AMPER_REDIR_APPEND, "&>>");
-                    i += 3;
-
-                } else if (input[i] == '|' && input[i+1] == '&') {
-                    new_token = create_token(TOKEN_PIPE_AMPER, "|&");
-                    i += 2;
-                } else if (input[i] == '|' && input[i+1] == '|') {
-                    new_token = create_token(TOKEN_OR, "||");
-                    i += 2;
-                } else if (input[i] == '&' && input[i+1] == '&') {
-                    new_token = create_token(TOKEN_AND, "&&");
-                    i += 2;
-                } else if (input[i] == '>' && input[i+1] == '>') {
-                    new_token = create_token(TOKEN_REDIR_APPEND, ">>");
-                    i += 2;
-                } else if (input[i] == '&' && input[i+1] == '>') {
-                    new_token = create_token(TOKEN_AMPER_REDIR_IN, "&>");
-                    i += 2;
-
-
-                } else if (input[i] == '|') {
-                    new_token = create_token(TOKEN_PIPE, "|");
-                    i += 1;
-                } else if (input[i] == '&') {
-                    new_token = create_token(TOKEN_AMPER, "&");
-                    i += 1;
-                } else if (input[i] == '<') {
-                    new_token = create_token(TOKEN_REDIR_IN, "<");
-                    i += 1;
-                } else if (input[i] == '>') {
-                    new_token = create_token(TOKEN_REDIR_OUT, ">");
-                    i += 1;
-                } else if (input[i] == ';') {
-                    new_token = create_token(TOKEN_SEMICOL, ";");
-                    i += 1;
-                } else if (input[i] == '(') {
-                    new_token = create_token(TOKEN_LPAREN, "(");
-                    i += 1;
-                } else if (input[i] == ')') {
-                    new_token = create_token(TOKEN_RPAREN, ")");
-                    i += 1;
-                } 
-
-                array_token[token_cnt++] = new_token;
+                {
+                    size_t op_len = 0;
+                    if (match_greedy_operator(input, i, len, &new_token, &op_len)) {
+                        array_token[token_cnt++] = new_token;
+                        i += op_len;
+                    } else {
+                        i++;
+                    }
+                }
                 break;          
 
             case WORD_IN_QUOTES:
@@ -171,6 +180,7 @@ Token *tokenize(const char *input){
                 size_t j = i;
                 size_t word_cap = 32;
                 size_t out = 0;
+                int has_single_quotes = 0;
                 char *word = (char*)malloc(word_cap);
                 if (!word) {
                     perror("malloc error");
@@ -181,6 +191,9 @@ Token *tokenize(const char *input){
                 while (j < len && !is_space(input[j]) && !is_delimiter(input[j])) {
                     if (input[j] == '"' || input[j] == '\'') {
                         char q = input[j++];
+                        if (q == '\'') {
+                            has_single_quotes = 1;
+                        }
                         int closed = 0;
 
                         while (j < len) {
@@ -285,7 +298,7 @@ Token *tokenize(const char *input){
 
                 word[out] = '\0';
 
-                new_token = create_token(TOKEN_WORD, word);
+                new_token = create_token(has_single_quotes ? TOKEN_WORD_IN_QUOTES : TOKEN_WORD, word);
                 array_token[token_cnt++] = new_token;
                 free(word);
 

@@ -179,7 +179,12 @@ int main() {
 
         Token *tokens = tokenize(cmd);
         free(cmd);
+ 
+ 
         if (!tokens) continue;
+
+        print_tokens(tokens);
+
 
         ASTNode *ast = parse(tokens);
         if (ast) {

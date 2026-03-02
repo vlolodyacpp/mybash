@@ -10,6 +10,7 @@
 #include <sys/wait.h>
 #include <string.h>
 #include <errno.h>
+#include <ctype.h>
 
 extern Job *first_job;             // голова списка фоновых заданий
 extern int shell_terminal;         // файловый дескриптор терминала (обычно STDIN)
@@ -122,35 +123,102 @@ int handle_redirection(Redirection *redir) {
     return 0;  
 }
 
-void expand_argv(char **argv) {
-    for (int i = 0; argv && argv[i]; i++) {
-        if (argv[i][0] != '$') continue;
+int append_slice(char **dst, size_t *len, size_t *cap, const char *src, size_t n) {
+    if (*len + n + 1 > *cap) {
+        size_t new_cap = *cap;
+        while (*len + n + 1 > new_cap) new_cap *= 2;
+        char *new_dst = realloc(*dst, new_cap);
+        if (!new_dst) return 0;
+        *dst = new_dst;
+        *cap = new_cap;
+    }
+    memcpy(*dst + *len, src, n);
+    *len += n;
+    (*dst)[*len] = '\0';
+    return 1;
+}
 
-        char buf[32];        
-        const char *rep = ""; 
+char *expand_one_arg(const char *arg) {
+    size_t cap = 64;
+    size_t out_len = 0;
+    char *out = malloc(cap);
+    if (!out) return NULL;
+    out[0] = '\0';
 
-        if (strcmp(argv[i], "$?") == 0) { // код возврата последней команды
-            snprintf(buf, sizeof(buf), "%d", g_last_status);
-            rep = buf; 
-        } else if (strcmp(argv[i], "$$") == 0) { // проверка пид текущего процесса
-            snprintf(buf, sizeof(buf), "%d", (int)getpid());
-            rep = buf;  
-        } else if (strcmp(argv[i], "$!") == 0) { // пид последного фонового процесса
-            snprintf(buf, sizeof(buf), "%d", (int)g_last_bg_pgid);
-            rep = buf;  
-        } else { // переменная окружения
-            const char *env = getenv(argv[i] + 1);
-            rep = env ? env : "";
+    for (size_t i = 0; arg[i] != '\0'; ) {
+        if (arg[i] != '$') {
+            if (!append_slice(&out, &out_len, &cap, &arg[i], 1)) {
+                free(out);
+                return NULL;
+            }
+            i++;
+            continue;
         }
 
-        // копия строки замены в динамической памяти
-        char *dup = strdup(rep);
-        if (!dup) { 
-            perror("strdup");  
-            continue; 
+        char buf[64];
+        const char *rep = "";
+        size_t consumed = 1;
+
+        if (arg[i + 1] == '?') {
+            snprintf(buf, sizeof(buf), "%d", g_last_status);
+            rep = buf;
+            consumed = 2;
+        } else if (arg[i + 1] == '$') {
+            snprintf(buf, sizeof(buf), "%d", (int)getpid());
+            rep = buf;
+            consumed = 2;
+        } else if (arg[i + 1] == '!') {
+            snprintf(buf, sizeof(buf), "%d", (int)g_last_bg_pgid);
+            rep = buf;
+            consumed = 2;
+        } else if (isalpha((unsigned char)arg[i + 1]) || arg[i + 1] == '_') {
+            size_t start = i + 1;
+            size_t end = start;
+            while (isalnum((unsigned char)arg[end]) || arg[end] == '_') end++;
+
+            size_t name_len = end - start;
+            char *name = malloc(name_len + 1);
+            if (!name) {
+                free(out);
+                return NULL;
+            }
+            memcpy(name, arg + start, name_len);
+            name[name_len] = '\0';
+
+            const char *env = getenv(name);
+            rep = env ? env : "";
+            free(name);
+            consumed = end - i;
+        } else {
+            if (!append_slice(&out, &out_len, &cap, "$", 1)) {
+                free(out);
+                return NULL;
+            }
+            i++;
+            continue;
+        }
+
+        if (!append_slice(&out, &out_len, &cap, rep, strlen(rep))) {
+            free(out);
+            return NULL;
+        }
+        i += consumed;
+    }
+
+    return out;
+}
+
+void expand_argv(char **argv, int *arg_no_expand) {
+    for (int i = 0; argv && argv[i]; i++) {
+        if (arg_no_expand && arg_no_expand[i]) continue;
+
+        char *expanded = expand_one_arg(argv[i]);
+        if (!expanded) {
+            perror("expand");
+            continue;
         }
         free(argv[i]);
-        argv[i] = dup;
+        argv[i] = expanded;
     }
 }
 
@@ -162,7 +230,7 @@ int exec_command_in_child(ASTNode *node) {
 
     if (!argv || !argv[0]) _exit(0); 
     
-    expand_argv(argv);
+    expand_argv(argv, node->command.arg_no_expand);
 
     // выполняем все перенаправления
     if (handle_redirection(node->command.redir) != 0) 
@@ -595,7 +663,7 @@ int execute_command(ASTNode *node) {
     if (!argv || !argv[0]) return 0; 
 
     // расширяем переменные окружения в аргументах 
-    expand_argv(argv);
+    expand_argv(argv, node->command.arg_no_expand);
 
     // встроенная ли команда
     if (is_builtin(argv[0])) {

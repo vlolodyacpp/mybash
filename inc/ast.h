@@ -38,6 +38,7 @@ typedef struct ASTNode {
         // def command
         struct{
             char **argv;
+            int *arg_no_expand;
             Redirection *redir;
             int argc;
         } command;
@@ -56,7 +57,7 @@ typedef struct ASTNode {
 
 
 ASTNode *create_node(NodeType);
-ASTNode *create_command(char**, Redirection*, int);
+ASTNode *create_command(char**, int*, Redirection*, int);
 ASTNode *create_binary(NodeType, ASTNode*, ASTNode*);
 ASTNode *create_unary(NodeType, ASTNode*);
 

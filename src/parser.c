@@ -3,6 +3,16 @@
 #include <string.h>
 #include <stdlib.h>
 
+const char *token_lexeme_or_eof(Token *tok) {
+    if (!tok || tok->type == TOKEN_EOF) {
+        return "EOF";
+    }
+    if (tok->value && tok->value[0] != '\0') {
+        return tok->value;
+    }
+    return "token";
+}
+
 
 ASTNode *parse(Token *tokens){
     if(!tokens || tokens[0].type == TOKEN_EOF){
@@ -10,7 +20,20 @@ ASTNode *parse(Token *tokens){
     }
 
     Token *curr = tokens;
-    return parse_list(&curr);
+    ASTNode *root = parse_list(&curr);
+
+    if (!root) {
+        fprintf(stderr, "Syntax error near '%s'\n", token_lexeme_or_eof(curr));
+        return NULL;
+    }
+
+    if (curr->type != TOKEN_EOF && curr->type != TOKEN_RPAREN) {
+        fprintf(stderr, "Syntax error: unexpected token '%s'\n", token_lexeme_or_eof(curr));
+        free_ast(root);
+        return NULL;
+    }
+
+    return root;
 }
 
 
@@ -74,6 +97,7 @@ ASTNode *parse_logical(Token **curr){
         // Парсим правую часть выражения
         ASTNode *right = parse_pipeline(curr);
         if(!right) { 
+            fprintf(stderr, "Syntax error: expected command after '%s'\n", op == TOKEN_AND ? "&&" : "||");
             free_ast(left);
             return NULL;
         }
@@ -98,7 +122,7 @@ ASTNode *parse_pipeline(Token **curr){
 
         ASTNode *right = parse_factor(curr);
         if(!right){
-            fprintf(stderr, "Syntax error: unknown command");
+            fprintf(stderr, "Syntax error: expected command after pipe\n");
             free_ast(left);
             return NULL;
         } 
@@ -147,18 +171,46 @@ ASTNode *parse_simple_command(Token **curr) {
     int capacity = 8;
     int argc = 0;
     char **argv = malloc(capacity * sizeof(char*));
+    int *arg_no_expand = calloc(capacity, sizeof(int));
     Redirection *redir_head = NULL;
+
+    if (!argv || !arg_no_expand) {
+        free(argv);
+        free(arg_no_expand);
+        return NULL;
+    }
 
 
     while (1) {
         // обрабатываем слова (имя команды и аргументы)
         if ((*curr) -> type == TOKEN_WORD || (*curr) -> type == TOKEN_WORD_IN_QUOTES) {
             if (argc >= capacity - 1) {
-                capacity *= 2;
-                argv = realloc(argv, capacity * sizeof(char*));
+                int new_capacity = capacity * 2;
+                char **new_argv = malloc(new_capacity * sizeof(char*));
+                int *new_arg_no_expand = calloc(new_capacity, sizeof(int));
+                if (!new_argv || !new_arg_no_expand) {
+                    free(new_argv);
+                    free(new_arg_no_expand);
+                    for (int i = 0; i < argc; ++i) free(argv[i]);
+                    free(argv);
+                    free(arg_no_expand);
+                    return NULL;
+                }
+
+                for (int i = 0; i < argc; ++i) {
+                    new_argv[i] = argv[i];
+                    new_arg_no_expand[i] = arg_no_expand[i];
+                }
+
+                free(argv);
+                free(arg_no_expand);
+                argv = new_argv;
+                arg_no_expand = new_arg_no_expand;
+                capacity = new_capacity;
             }
            
             argv[argc++] = strdup((*curr) -> value);
+            arg_no_expand[argc - 1] = ((*curr)->type == TOKEN_WORD_IN_QUOTES) ? 1 : 0;
             (*curr)++;
         } // обрабатываем перенаправления 
         else if ((*curr) -> type == TOKEN_REDIR_IN || (*curr) -> type == TOKEN_REDIR_OUT || 
@@ -184,6 +236,9 @@ ASTNode *parse_simple_command(Token **curr) {
                 (*curr)++; // пропускаем имя файла
             } else {
                 fprintf(stderr, "Syntax error: expected filename\n");
+                for (int i = 0; i < argc; ++i) free(argv[i]);
+                free(argv);
+                free(arg_no_expand);
                 return NULL;
             }
         } else {
@@ -193,7 +248,7 @@ ASTNode *parse_simple_command(Token **curr) {
 
     argv[argc] = NULL;
     
-    return create_command(argv, redir_head, argc);
+    return create_command(argv, arg_no_expand, redir_head, argc);
 }
 
 
