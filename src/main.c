@@ -31,7 +31,6 @@ void print_prompt(){
 }
 
 
-
 void test_parser(const char *input) {
     printf("\n>>> Parsing: \"%s\"\n", input);
     

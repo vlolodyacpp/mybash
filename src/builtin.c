@@ -116,7 +116,6 @@ void update_job_status_after_signal(Job *job, int sig) {
 }
 
 
-
 const char *job_status_str(JobStatus st) {
     switch (st) {
         case JOB_RUNNING: return "Running";
@@ -345,8 +344,8 @@ int builtin_set(char **argv) {
             return 1;
         }
 
-        size_t name_len = (size_t)(eq - argv[i]);
-        if (!is_valid_var_name(argv[i], name_len)) {
+        size_t name_len = strcspn(argv[i], "=");
+        if (argv[i][name_len] != '=' || name_len == 0) { 
             fprintf(stderr, "set: usage: set VAR=value [VAR2=value2 ...]\n");
             return 1;
         }

@@ -17,10 +17,10 @@ extern int shell_terminal;         // файловый дескриптор те
 extern int shell_is_interactive;   // флаг: работаем ли в интерактивном режиме
 extern pid_t shell_pgid;           // идентификатор группы процессов shell
 
-// код завершения последней выполненной команды (для переменной $?)
+// код завершения последней выполненной команды (для $?)
 int g_last_status = 0;
 
-// пид последнего фонового задания (для переменной $!)
+// пид последнего фонового задания (для $!)
 pid_t g_last_bg_pgid = 0;
 
 int handle_redirection(Redirection *redir) {
@@ -221,8 +221,6 @@ void expand_argv(char **argv, int *arg_no_expand) {
         argv[i] = expanded;
     }
 }
-
-
 
 
 int exec_command_in_child(ASTNode *node) {

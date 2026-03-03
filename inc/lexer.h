@@ -5,7 +5,6 @@
 extern const char word_delimeters[];
 typedef enum{
     SIMPLE_WORD,
-    WORD_IN_QUOTES,
     DELIMETERS,
 } SimpleWord;
 

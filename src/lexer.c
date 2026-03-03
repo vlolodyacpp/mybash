@@ -6,7 +6,6 @@
 
 #define STANDART_CAPACITY 16
 
-
 const char word_delimeters[] = " \t;|&<>()"; 
 int g_unclosed_quote = 0;
 
@@ -32,7 +31,7 @@ int match_greedy_operator(const char *input, size_t pos, size_t len, Token *out_
         {")", TOKEN_RPAREN},
     };
 
-    size_t best_idx = (size_t)-1;
+    size_t best_idx = -1;
     size_t best_len = 0;
     size_t ops_count = sizeof(ops) / sizeof(ops[0]);
 
@@ -47,7 +46,7 @@ int match_greedy_operator(const char *input, size_t pos, size_t len, Token *out_
         }
     }
 
-    if (best_idx == (size_t)-1) {
+    if (best_idx == -1) {
         return 0;
     }
 
@@ -70,7 +69,6 @@ int is_space(char c){
 
 
 int define_simple_word(char c){
-    if(c == '"' || c == '\'') return WORD_IN_QUOTES;
     if(is_delimiter(c)) return DELIMETERS;
     return SIMPLE_WORD;
 }
@@ -118,7 +116,6 @@ Token create_token(TokenType type, char *value){
     }
     return token;
 }
-
 
 
 Token *tokenize(const char *input){
@@ -174,8 +171,6 @@ Token *tokenize(const char *input){
                     }
                 }
                 break;          
-
-            case WORD_IN_QUOTES:
             case SIMPLE_WORD: {
                 size_t j = i;
                 size_t word_cap = 32;

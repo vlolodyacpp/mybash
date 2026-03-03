@@ -27,7 +27,7 @@ ASTNode *parse(Token *tokens){
         return NULL;
     }
 
-    if (curr->type != TOKEN_EOF && curr->type != TOKEN_RPAREN) {
+    if (curr->type != TOKEN_EOF) {
         fprintf(stderr, "Syntax error: unexpected token '%s'\n", token_lexeme_or_eof(curr));
         free_ast(root);
         return NULL;
