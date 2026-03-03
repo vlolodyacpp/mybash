@@ -30,13 +30,12 @@ int match_greedy_operator(const char *input, size_t pos, size_t len, Token *out_
         {"(", TOKEN_LPAREN},
         {")", TOKEN_RPAREN},
     };
+    int best_idx = -1;
+    int best_len = 0;
+    int ops_count = sizeof(ops) / sizeof(ops[0]);
 
-    size_t best_idx = -1;
-    size_t best_len = 0;
-    size_t ops_count = sizeof(ops) / sizeof(ops[0]);
-
-    for (size_t op_idx = 0; op_idx < ops_count; ++op_idx) {
-        size_t op_len = strlen(ops[op_idx].lexeme);
+    for (int op_idx = 0; op_idx < ops_count; ++op_idx) {
+        int op_len = strlen(ops[op_idx].lexeme);
         if (pos + op_len > len) {
             continue;
         }

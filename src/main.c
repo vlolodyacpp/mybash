@@ -30,25 +30,6 @@ void print_prompt(){
 
 }
 
-
-void test_parser(const char *input) {
-    printf("\n>>> Parsing: \"%s\"\n", input);
-    
-    Token *tokens = tokenize(input);
-    if (!tokens) return;
-    
-    ASTNode *ast = parse(tokens);
-    
-    if (ast) {
-        print_ast(ast);
-        execute(ast);
-        free_ast(ast);
-    } else {
-        printf("Parser returned NULL (empty or error)\n");
-    }
-
-    free_tokens(tokens);
-}
 char *read_command_line(void) {
     char *curr_line = NULL;
     size_t line_buf_size = 0;
@@ -82,8 +63,9 @@ char *read_command_line(void) {
 
         // проверка continuation
         size_t L = strlen(curr_line);
-        int cont = (L > 0 && curr_line[L-1] == '\\');
-        if (cont) curr_line[L-1] = '\0';
+        if (L > 0 && curr_line[L-1] == '\\'){
+            curr_line[L-1] = '\0';
+        }
 
         size_t add = strlen(curr_line);
         
@@ -106,7 +88,7 @@ char *read_command_line(void) {
         accum_len += add;
         accum_input[accum_len] = '\0';
 
-        if (cont) {
+        if (L > 0 && curr_line[L-1] == '\\') {
             first_line = 0;
             join_without_newline = 1;
             continue;

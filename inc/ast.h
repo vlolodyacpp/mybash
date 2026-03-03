@@ -32,7 +32,6 @@ typedef struct Redirection {
 
 typedef struct ASTNode { 
     NodeType type;
-    // Для разных ситтуаций разное наполнение узла, экономим память и обрабатываем конкртено отдельный случай
     union {
 
         // def command

@@ -14,7 +14,7 @@
 
 extern Job *first_job;             // голова списка фоновых заданий
 extern int shell_terminal;         // файловый дескриптор терминала (обычно STDIN)
-extern int shell_is_interactive;   // флаг: работаем ли в интерактивном режиме
+extern int shell_is_interactive;   // работаем ли в интерактивном режиме
 extern pid_t shell_pgid;           // идентификатор группы процессов shell
 
 // код завершения последней выполненной команды (для $?)
@@ -23,8 +23,22 @@ int g_last_status = 0;
 // пид последнего фонового задания (для $!)
 pid_t g_last_bg_pgid = 0;
 
+typedef struct {
+    ASTNode **stages;    
+    int     *pipe_stderr; 
+    int      count;       
+} Pipeline;
+
+static int count_pipe_depth(ASTNode *node) {
+    int n = 1;
+    while (node && (node->type == NODE_PIPE || node->type == NODE_PIPE_STDERR)) {
+        n++;
+        node = node->binary.left;
+    }
+    return n;
+}
+
 int handle_redirection(Redirection *redir) {
-    // Проходим по связному списку всех перенаправлений для этой команды
     for (Redirection *r = redir; r; r = r->next) {
         int fd = -1;  
 
@@ -35,17 +49,17 @@ int handle_redirection(Redirection *redir) {
                     perror(r->filename); 
                     return 1; 
                 }  
-                // копируем дескриптор fd в STDIN (0)
+                // копируем дескриптор fd 
                 if (dup2(fd, STDIN_FILENO) < 0) { 
                     perror("dup2"); 
                     close(fd); 
                     return 1; 
                 }
 
-                close(fd);  // Закрываем оригинальный дескриптор (он больше не нужен)
+                close(fd);  
                 break;
 
-            case REDIR_OUT:  // Перенаправление вывода: > file
+            case REDIR_OUT:  
                 fd = open(r->filename, O_CREAT | O_WRONLY | O_TRUNC, 0644);
                 if (fd < 0) { 
                     perror(r->filename); 
@@ -57,10 +71,10 @@ int handle_redirection(Redirection *redir) {
                     return 1; 
                 }
 
-                close(fd);  // Закрываем оригинальный дескриптор
+                close(fd);  
                 break;
 
-            case REDIR_APPEND:  // >> 
+            case REDIR_APPEND: 
                 fd = open(r->filename, O_CREAT | O_WRONLY | O_APPEND, 0644);
                 if (fd < 0) { 
                     perror(r->filename); 
@@ -75,7 +89,7 @@ int handle_redirection(Redirection *redir) {
                 close(fd); 
                 break;
 
-            case REDIR_ERR_OUT:  //  &> 
+            case REDIR_ERR_OUT: 
                 fd = open(r->filename, O_CREAT | O_WRONLY | O_TRUNC, 0644);
                 if (fd < 0) { 
                     perror(r->filename); 
@@ -96,7 +110,7 @@ int handle_redirection(Redirection *redir) {
                 close(fd);  
                 break;
 
-            case REDIR_ERR_APPEND:  //  &>>
+            case REDIR_ERR_APPEND:  
                 fd = open(r->filename, O_CREAT | O_WRONLY | O_APPEND, 0644);
                 if (fd < 0) { 
                     perror(r->filename); 
@@ -246,95 +260,37 @@ int exec_command_in_child(ASTNode *node) {
     _exit(127);  
 }
 
-int flatten_pipeline(ASTNode *node, ASTNode ***stages_out, int **pipe_stderr_out, int *n_out) {
-    int capacity = 8, count_command = 0, count_op = 0;
+// разворачиваем дерево пайпов в плоский массив команд
+Pipeline flatten_pipeline(ASTNode *node) {
+    Pipeline p = {NULL, NULL, 0};
 
-    ASTNode **array_p_unit = malloc(sizeof(ASTNode*) * capacity);
-    int *array_f_op = malloc(sizeof(int) * capacity);
+    int count = count_pipe_depth(node);
 
-    if (!array_p_unit || !array_f_op) { 
-        free(array_p_unit); 
-        free(array_f_op); 
-        return 1; 
+    p.stages = malloc(sizeof(ASTNode *) * count);
+    p.pipe_stderr = calloc((count > 1) ? (count - 1) : 1, sizeof(int));
+
+    if (!p.stages || !p.pipe_stderr) {
+        free(p.stages);
+        free(p.pipe_stderr);
+        p.stages = NULL;
+        return p;
     }
 
+    // спускаемся по левой ветке, правые дети — в массив
+    int idx = count - 1;
     ASTNode *cur = node;
+
     while (cur && (cur->type == NODE_PIPE || cur->type == NODE_PIPE_STDERR)) {
-
-        //расширение
-        if (count_command + 1 >= capacity) {
-            capacity *= 2;
-
-            ASTNode **new_apu = realloc(array_p_unit, sizeof(ASTNode*) * capacity);
-
-            if (!new_apu) { 
-                free(array_p_unit); 
-                free(array_f_op); 
-                return 1; 
-            }
-
-            array_p_unit = new_apu;
-
-            int *new_afo = realloc(array_f_op, sizeof(int) * capacity);
-            if (!new_afo) { 
-                free(array_p_unit); 
-                free(array_f_op); 
-                return 1; 
-            }
-            array_f_op = new_afo;
-        }
-
-        //Спускаемся по пайпам влево, по командам вправо
-        array_p_unit[count_command++] = cur -> binary.right;
-        array_f_op[count_op++] = (cur -> type == NODE_PIPE_STDERR) ? 1 : 0; // тип пайпа
+        p.stages[idx] = cur->binary.right;
+        if (idx > 0)
+            p.pipe_stderr[idx - 1] = (cur->type == NODE_PIPE_STDERR) ? 1 : 0;
+        idx--;
         cur = cur->binary.left;
     }
+    p.stages[0] = cur; // самая левая команда
 
-    if (count_command + 1 >= capacity) {
-        capacity += 1;
-        ASTNode **new_apu = realloc(array_p_unit, sizeof(ASTNode*) * capacity);
-        if (!new_apu) { 
-            free(array_p_unit); 
-            free(array_f_op); 
-            return 1; 
-        }
-        array_p_unit = new_apu;
-    }
-    array_p_unit[count_command++] = cur; // последняя левая
-
-    int final_count_command = count_command;
-    ASTNode **final_apu = malloc(sizeof(ASTNode*) * final_count_command);
-    int *pipe_stderr = calloc((final_count_command > 1) ? (final_count_command - 1) : 1, sizeof(int));
-
-    if (!final_apu || !pipe_stderr) {
-        free(array_p_unit); 
-        free(array_f_op); 
-        free(final_apu); 
-        free(pipe_stderr);
-        return 1;
-    }
-
-    // запонляем в обратном порядке
-    for (int i = 0; i < final_count_command; i++) {
-        final_apu[i] = array_p_unit[final_count_command - 1 - i];
-    }
-
-
-    // аналогично для операторов
-    for (int k = 0; k < count_op; k++) {
-        int edge_idx = (final_count_command - 2) - k;
-        if (edge_idx >= 0 && edge_idx < final_count_command - 1) {
-            pipe_stderr[edge_idx] = array_f_op[k];
-        }
-    }
-
-    free(array_p_unit);
-    free(array_f_op);
-
-    *stages_out = final_apu;
-    *pipe_stderr_out = pipe_stderr;
-    *n_out = final_count_command;
-    return 0;
+    p.count = count;
+    return p;
 }
 
 
@@ -381,39 +337,32 @@ int wait_foreground_pgid(pid_t pgid, pid_t last_pid) {
 }
 
 int execute_pipeline_node(ASTNode *node) {
-    ASTNode **stages = NULL; // массив указателей на команды
-    int *pipe_stderr = NULL;
-    int count_command = 0;
+    Pipeline p = flatten_pipeline(node);
 
-    if (flatten_pipeline(node, &stages, &pipe_stderr, &count_command) != 0) {
+    if (!p.stages || p.count <= 0) {
         fprintf(stderr, "pipeline: flatten failed\n");
+        free(p.stages);
+        free(p.pipe_stderr);
         return 1;
     }
 
-
-    if (count_command <= 0) { 
-        free(stages); 
-        free(pipe_stderr); 
-        return 1; 
-    }
-
     // команда без пайпа
-    if (count_command == 1) { 
-        int rc = execute_internal(stages[0], 0);
-        free(stages);
-        free(pipe_stderr);
+    if (p.count == 1) { 
+        int rc = execute_internal(p.stages[0], 0);
+        free(p.stages);
+        free(p.pipe_stderr);
         return rc;
     }
 
-    int pipes_count = count_command - 1;
+    int pipes_count = p.count - 1;
     int (*pipes)[2] = calloc(pipes_count, sizeof(int[2])); //массив пар для пайпа(r/w)
-    pid_t *pids = calloc(count_command, sizeof(pid_t)); // массив пидов дочерок
+    pid_t *pids = calloc(p.count, sizeof(pid_t)); // массив пидов дочерок
     if (!pipes || !pids) {
         perror("calloc");
         free(pipes); 
         free(pids);
-        free(stages); 
-        free(pipe_stderr);
+        free(p.stages); 
+        free(p.pipe_stderr);
         return 1;
     }
 
@@ -429,15 +378,15 @@ int execute_pipeline_node(ASTNode *node) {
 
             free(pipes); 
             free(pids);
-            free(stages); 
-            free(pipe_stderr);
+            free(p.stages); 
+            free(p.pipe_stderr);
             return 1;
         }
     }
 
     pid_t pgid = 0;
 
-    for (int i = 0; i < count_command; i++) {
+    for (int i = 0; i < p.count; i++) {
         pid_t pid = fork();
         if (pid < 0) {
             perror("fork");
@@ -448,8 +397,8 @@ int execute_pipeline_node(ASTNode *node) {
             }
             free(pipes); 
             free(pids);
-            free(stages); 
-            free(pipe_stderr);
+            free(p.stages); 
+            free(p.pipe_stderr);
             return 1;
         }
 
@@ -473,9 +422,9 @@ int execute_pipeline_node(ASTNode *node) {
                 dup2(pipes[i - 1][0], STDIN_FILENO);
             }
             // перенаправление stdout не первая команда -> пишем в pipe
-            if (i < count_command - 1) {
+            if (i < p.count - 1) {
                 dup2(pipes[i][1], STDOUT_FILENO);
-                if (pipe_stderr[i]) {
+                if (p.pipe_stderr[i]) {
                     dup2(pipes[i][1], STDERR_FILENO);
                 }
             }
@@ -486,10 +435,10 @@ int execute_pipeline_node(ASTNode *node) {
                 close(pipes[k][1]);
             }
 
-            if (stages[i] && stages[i]->type == NODE_COMMAND) {
-                exec_command_in_child(stages[i]);
+            if (p.stages[i] && p.stages[i]->type == NODE_COMMAND) {
+                exec_command_in_child(p.stages[i]);
             } else {
-                int rc = execute_internal(stages[i], 1);
+                int rc = execute_internal(p.stages[i], 1);
                 _exit(rc);
             }
         }
@@ -519,7 +468,7 @@ int execute_pipeline_node(ASTNode *node) {
         add_job(pgid, "pipeline", JOB_RUNNING, 0);
 
         tcsetpgrp(shell_terminal, pgid);
-        rc = wait_foreground_pgid(pgid, pids[count_command - 1]);
+        rc = wait_foreground_pgid(pgid, pids[p.count - 1]);
         tcsetpgrp(shell_terminal, shell_pgid);
 
         // после завершения возвращаем управление шеллу и обновляем статус
@@ -530,9 +479,9 @@ int execute_pipeline_node(ASTNode *node) {
         }
     } else { // простое ожидание пока не закончится
         int status = 0;
-        for (int i = 0; i < count_command; i++) {
+        for (int i = 0; i < p.count; i++) {
             waitpid(pids[i], &status, 0);
-            if (i == count_command - 1) {
+            if (i == p.count - 1) {
                 if (WIFEXITED(status)) rc = WEXITSTATUS(status);
                 else if (WIFSIGNALED(status)) rc = 128 + WTERMSIG(status);
                 else rc = 1;
@@ -542,8 +491,8 @@ int execute_pipeline_node(ASTNode *node) {
 
     free(pipes);
     free(pids);
-    free(stages);
-    free(pipe_stderr);
+    free(p.stages);
+    free(p.pipe_stderr);
     return rc;
 }
 
@@ -572,7 +521,7 @@ int execute_internal(ASTNode *node, int in_child) {
 
         // последовательное выполнение - код выходной левой команды не запоминаем
         case NODE_SEQUENCE:
-            (void)execute_internal(node->binary.left, in_child);
+            execute_internal(node->binary.left, in_child);
             return execute_internal(node->binary.right, in_child);
 
         // сначала левую, потом правую

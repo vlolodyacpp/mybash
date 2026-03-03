@@ -21,6 +21,15 @@ extern int g_last_status;
 static int g_shell_exit_requested = 0;
 static int g_shell_exit_code = 0;
 
+const char *job_status_str(JobStatus st) {
+    switch (st) {
+        case JOB_RUNNING: return "Running";
+        case JOB_STOPPED: return "Stopped";
+        case JOB_DONE:    return "Done";
+        default:          return "Unknown";
+    }
+}
+
 void request_shell_exit(int code) {
     g_shell_exit_requested = 1;
     g_shell_exit_code = code;
@@ -116,14 +125,6 @@ void update_job_status_after_signal(Job *job, int sig) {
 }
 
 
-const char *job_status_str(JobStatus st) {
-    switch (st) {
-        case JOB_RUNNING: return "Running";
-        case JOB_STOPPED: return "Stopped";
-        case JOB_DONE:    return "Done";
-        default:          return "Unknown";
-    }
-}
 
 void print_jobs_list() {
     Job *job = first_job;
