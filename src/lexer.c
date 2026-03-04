@@ -182,6 +182,7 @@ Token *tokenize(const char *input){
                     return NULL;
                 }
 
+                // начало ковычки 
                 while (j < len && !is_space(input[j]) && !is_delimiter(input[j])) {
                     if (input[j] == '"' || input[j] == '\'') {
                         char q = input[j++];
@@ -189,9 +190,10 @@ Token *tokenize(const char *input){
                             has_single_quotes = 1;
                         }
                         int closed = 0;
-
+                        // обработка внутри кавычек
                         while (j < len) {
                             if (input[j] == '\\') {
+                                // незакрытая кавычка после переноса
                                 if (j + 1 >= len) {
                                     g_unclosed_quote = 1;
                                     free(word);
@@ -200,7 +202,7 @@ Token *tokenize(const char *input){
                                     free_tokens(array_token);
                                     return NULL;
                                 }
-
+                                // если нету места выделяем, и записываем символ
                                 if (out + 2 > word_cap) {
                                     word_cap *= 2;
                                     char *new_word = (char*)realloc(word, word_cap);
@@ -218,6 +220,7 @@ Token *tokenize(const char *input){
                                 continue;
                             }
 
+                            
                             if (input[j] == q) {
                                 closed = 1;
                                 j++;
@@ -249,7 +252,7 @@ Token *tokenize(const char *input){
 
                         continue;
                     }
-
+                    // вне кавычек перенос
                     if (input[j] == '\\') {
                         if (j + 1 >= len) {
                             fprintf(stderr, "syntax error: trailing \n");
@@ -275,6 +278,8 @@ Token *tokenize(const char *input){
                         continue;
                     }
 
+                    // символ без кавычек и переносов
+                    
                     if (out + 2 > word_cap) {
                         word_cap *= 2;
                         char *new_word = (char*)realloc(word, word_cap);

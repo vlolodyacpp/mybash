@@ -38,6 +38,8 @@ static int count_pipe_depth(ASTNode *node) {
     return n;
 }
 
+
+// обработка перенаправлений
 int handle_redirection(Redirection *redir) {
     for (Redirection *r = redir; r; r = r->next) {
         int fd = -1;  
@@ -185,10 +187,10 @@ char *expand_one_arg(const char *arg) {
             snprintf(buf, sizeof(buf), "%d", (int)g_last_bg_pgid);
             rep = buf;
             consumed = 2;
-        } else if (isalpha((unsigned char)arg[i + 1]) || arg[i + 1] == '_') {
+        } else if (isalpha(arg[i + 1]) || arg[i + 1] == '_') {
             size_t start = i + 1;
             size_t end = start;
-            while (isalnum((unsigned char)arg[end]) || arg[end] == '_') end++;
+            while (isalnum(arg[end]) || arg[end] == '_') end++;
 
             size_t name_len = end - start;
             char *name = malloc(name_len + 1);
