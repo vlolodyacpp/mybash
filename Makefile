@@ -11,7 +11,6 @@ DEPS := $(patsubst $(SRC_DIR)/%.c, $(DEP_DIR)/%.d, $(SRCS))
 TARGET := $(BIN_DIR)/main
 
 CXX := gcc
-WARNINGS := -Wall -Wextra -Werror -Wpedantic
 CPPFLAGS := -I$(INC_DIR) -MMD -MP
 CXXFLAGS := -g $(WARNINGS) $(CPPFLAGS)
 VALGRINDFLAG := --leak-check=full 

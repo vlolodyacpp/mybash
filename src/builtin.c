@@ -11,8 +11,9 @@
 #include <string.h>
 #include <errno.h>
 #include <ctype.h>
+#include "../inc/history.h"
 #include <limits.h>
-
+#define  _GNU_SOURCE
 extern Job *first_job;
 extern pid_t shell_pgid;              
 extern int shell_terminal;
@@ -145,6 +146,7 @@ int is_builtin(const char *s) {
            strcmp(s, "jobs") == 0 ||
            strcmp(s, "fg") == 0 ||
            strcmp(s, "bg") == 0 ||
+           strcmp(s, "history") == 0 ||
            strcmp(s, "kill") == 0 ||
            strcmp(s, "set") == 0 ||
            strcmp(s, "unset") == 0;
@@ -215,7 +217,6 @@ int builtin_echo(char **argv) {
 }
 
 int builtin_pwd(char **argv) {
-    (void)argv;
     char cwd[1024];
     if (getcwd(cwd, sizeof(cwd))) {
         printf("%s\n", cwd);
@@ -227,7 +228,6 @@ int builtin_pwd(char **argv) {
 }
 
 int builtin_help(char **argv) {
-    (void)argv;
     printf("MyBash builtins:\n");
     printf("  cd [dir]          - Change directory\n");
     printf("  pwd               - Print working directory\n");
@@ -238,13 +238,13 @@ int builtin_help(char **argv) {
     printf("  fg %%jobid         - Move job to foreground\n");
     printf("  bg %%jobid         - Continue job in background\n");
     printf("  kill [-SIG] <pid> - Send signal to process\n");
+    printf("  history           - Show recent commands\n");
     printf("  set VAR=value     - Set environment variable\n");
     printf("  unset VAR         - Unset environment variable\n");
     return 0;
 }
 
 int builtin_jobs(char **argv) {
-    (void)argv;
     print_jobs_list();
     return 0;
 }
@@ -381,6 +381,16 @@ int builtin_unset(char **argv) {
     return 0;
 }
 
+int builtin_history(char **argv) {
+    size_t count = history_size();
+    for (size_t i = 0; i < count; ++i) {
+        const char *entry = history_get(i);
+        printf("%zu  %s\n", i + 1, entry ? entry : "");
+    }
+
+    return 0;
+}
+
 
 
 int run_builtin(char **argv) {
@@ -393,6 +403,7 @@ int run_builtin(char **argv) {
     if (strcmp(argv[0], "fg") == 0)     return builtin_fg(argv);
     if (strcmp(argv[0], "bg") == 0)     return builtin_bg(argv);
     if (strcmp(argv[0], "kill") == 0)   return builtin_kill(argv);
+    if (strcmp(argv[0], "history") == 0)return builtin_history(argv);
     if (strcmp(argv[0], "set") == 0)    return builtin_set(argv);
     if (strcmp(argv[0], "unset") == 0)  return builtin_unset(argv);
     
@@ -506,3 +517,4 @@ int builtin_bg(char **args) {
     }
     return 0;
 }
+

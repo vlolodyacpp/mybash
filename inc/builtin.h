@@ -23,6 +23,7 @@ int builtin_jobs(char **);
 int builtin_kill(char **);
 int builtin_fg(char **);
 int builtin_bg(char **);
+int builtin_history(char **);
 int is_valid_var_name(const char *, size_t);
 int builtin_set(char **);
 int builtin_unset(char **);
